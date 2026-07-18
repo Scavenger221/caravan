@@ -1349,25 +1349,25 @@ function renderDecks() {
     const inDeck = deck.cards[k] || 0;
     const r = keyRank(k), s = keySuit(k);
     const cell = document.createElement('div');
-    cell.className = 'coll-cell' + (owned === 0 ? ' locked' : '');
+    cell.className = 'coll-cell' + (owned === 0 ? ' locked' : inDeck > 0 ? ' sel' : '');
+    cell.dataset.k = k;
     const colorCls = r === 14 ? ' purple' : (RED[s] ? ' red' : '');
     cell.innerHTML = `
       <span class="cc-face${colorCls}">${keyLabel(k)}</span>
-      <span class="cc-counts">${inDeck}<i>/${owned}</i></span>
-      <span class="cc-btns">
-        <button ${inDeck === 0 ? 'disabled' : ''} data-k="${k}" data-d="-1">−</button>
-        <button ${inDeck >= owned ? 'disabled' : ''} data-k="${k}" data-d="1">+</button>
-      </span>`;
+      <span class="cc-counts">${inDeck}<i>/${owned}</i></span>`;
     grid.appendChild(cell);
   }
+  // tap a card to select it; tapping again cycles through owned copies, then off
   grid.onclick = e => {
-    const btn = e.target.closest('button[data-k]');
-    if (!btn || btn.disabled) return;
-    const k = btn.dataset.k, d = parseInt(btn.dataset.d, 10);
+    const cell = e.target.closest('.coll-cell[data-k]');
+    if (!cell) return;
+    const k = cell.dataset.k;
+    const owned = save.collection[k] || 0;
+    if (!owned) return;
     const deck2 = save.decks[deckEditIdx];
-    const next = (deck2.cards[k] || 0) + d;
-    if (next < 0 || next > (save.collection[k] || 0)) return;
+    const next = ((deck2.cards[k] || 0) + 1) % (owned + 1);
     if (next === 0) delete deck2.cards[k]; else deck2.cards[k] = next;
+    Sound.sfx('select');
     persist(); renderDecks();
   };
 }
