@@ -1,6 +1,6 @@
 /* Caravan service worker — offline-first cache */
-const CACHE = 'caravan-v12';
-const ASSETS = ['./', './index.html', './style.css?v=12', './game.js?v=12', './manifest.json', './icon.png'];
+const CACHE = 'caravan-v13';
+const ASSETS = ['./', './index.html', './style.css?v=13', './game.js?v=13', './manifest.json', './icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
