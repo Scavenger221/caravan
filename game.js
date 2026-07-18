@@ -71,6 +71,9 @@ function migrateCollection(s) {
   s.claimed = s.claimed || {};
   if (typeof s.xp !== 'number') s.xp = 0;
   if (typeof s.level !== 'number') s.level = 1;
+  if (typeof s.rating !== 'number') s.rating = 1000;
+  if (!Array.isArray(s.circuitLog)) s.circuitLog = [];
+  if (s.lbSeen === undefined) s.lbSeen = null;
   return s;
 }
 function persist() {
@@ -188,14 +191,17 @@ function cardDesc(c) {
 }
 
 /* ---------------- Game state ---------------- */
-const AI_NAMES = ['Ringo', 'Cass', 'No-bark', 'Raul', 'Veronica', 'Benny'];
 let G = null; // current match
 
 function newMatch(bet) {
+  const rivalIdx = pendingRival != null ? pendingRival : pickRival();
+  pendingRival = null;
   G = {
     bet,
-    mode: 'ai', // 'ai' | 'local' (pass & play)
-    oppName: AI_NAMES[Math.floor(Math.random() * AI_NAMES.length)],
+    mode: 'ai', // 'ai' | 'online'
+    rival: rivalIdx,             // index into RIVALS (Mojave Circuit)
+    rivalEps: rivalEps(rivalIdx),
+    oppName: RIVALS[rivalIdx].name,
     deck: { p: buildPlayerDeck(), a: makeDeck() },
     hand: { p: [], a: [] },
     cvs: { p: [newCv(), newCv(), newCv()], a: [newCv(), newCv(), newCv()] },
@@ -450,8 +456,12 @@ function aiTakeTurn() {
   }
 
   if (!best) return null;
-  // difficulty: chance to play a random (usually worse) legal move instead of the best
-  const eps = { easy: 0.45, normal: 0.08, hard: 0 }[save.difficulty] || 0;
+  // blunder rate: the rival's circuit rating sets the base, the difficulty
+  // setting adds forgiveness on top (easy makes everyone sloppier)
+  const diffAdj = { easy: 0.25, normal: 0.05, hard: 0 }[save.difficulty] || 0;
+  const eps = G.rivalEps != null
+    ? Math.min(0.6, G.rivalEps + diffAdj)
+    : ({ easy: 0.45, normal: 0.08, hard: 0 }[save.difficulty] || 0);
   if (eps && Math.random() < eps && all.length > 1) best = all[Math.floor(Math.random() * all.length)];
   if (best.type === 'play') {
     const c = G.hand.a[best.handIdx];
@@ -545,6 +555,9 @@ function refreshMenu() {
   $('level-num').textContent = 'Lv ' + save.level;
   $('xp-label').textContent = save.xp + ' / ' + xpNeeded(save.level) + ' XP';
   $('xp-fill').style.width = Math.min(100, Math.round(save.xp / xpNeeded(save.level) * 100)) + '%';
+  const ev = circuit().events[0];
+  $('menu-ticker').innerHTML = `#${myRank()} on the circuit · ${rankTitle(save.rating)}`
+    + (ev ? ` — <b>${RIVALS[ev.w].name}</b> beat ${RIVALS[ev.l].name} ${agoLabel(ev.at)}` : '');
 }
 $('btn-play').onclick = () => openBetScreen();
 $('btn-leaderboard').onclick = () => { renderLeaderboard(); show('screen-leaderboard'); };
@@ -559,7 +572,22 @@ $('btn-help').onclick = () => { rulesReturn = 'screen-game'; show('screen-rules'
 /* ---------------- Bet screen ---------------- */
 const BETS = [10, 25, 50, 100];
 let chosenBet = 10;
-function openBetScreen() {
+let pendingRival = null; // RIVALS index picked on the bet screen (or by call-out)
+function renderBetOpp() {
+  const i = pendingRival;
+  const c = circuit();
+  const rank = ladder().findIndex(x => !x.me && x.i === i) + 1;
+  const marked = i === markedRival();
+  const above = c.r[i] > save.rating;
+  $('bet-opp').innerHTML = `
+    <span class="bo-name">${RIVALS[i].name}</span>
+    <span class="bo-sub">#${rank} on the circuit · rating ${c.r[i]}</span>
+    ${marked ? '<span class="bo-bounty">Marked today — win pays a 2× caps bounty</span>'
+      : above ? '<span class="bo-bounty">Ranked above you — win pays a caps bounty</span>' : ''}
+    <button class="btn small btn-ghost" id="btn-reroll">Different opponent</button>`;
+  $('btn-reroll').onclick = () => { pendingRival = pickRival(pendingRival); renderBetOpp(); };
+}
+function openBetScreen(rival) {
   if (save.caps < BETS[0]) {
     save.caps = 50; // house stake
     persist();
@@ -589,6 +617,8 @@ function openBetScreen() {
     if (ok >= 0) { save.activeDeck = ok; deckChosen = true; }
   }
   renderDeckSelect();
+  pendingRival = rival != null ? rival : (pendingRival != null ? pendingRival : pickRival());
+  renderBetOpp();
   show('screen-bet');
 }
 let deckChosen = false; // must actively pick a deck every time
@@ -606,7 +636,7 @@ function renderDeckSelect() {
   });
   $('btn-start-match').disabled = !deckChosen || deckSize(save.decks[save.activeDeck]) < MIN_DECK;
 }
-$('btn-bet-back').onclick = () => show('screen-menu');
+$('btn-bet-back').onclick = () => { pendingRival = null; refreshMenu(); show('screen-menu'); };
 $('btn-start-match').onclick = () => {
   if (!chosenBet) return;
   startMatch(chosenBet);
@@ -871,7 +901,7 @@ $('btn-quit').onclick = () => {
 $('btn-rematch').onclick = () => {
   $('overlay-result').classList.remove('active');
   if (lastMode === 'online') { Net.close(); resetOnlineScreen(); show('screen-online'); }
-  else openBetScreen();
+  else openBetScreen(G ? G.rival : null); // rematch the same rival
 };
 $('btn-result-menu').onclick = () => { $('overlay-result').classList.remove('active'); refreshMenu(); show('screen-menu'); };
 
@@ -889,12 +919,31 @@ function endMatch(winner, detail) {
     save.caps -= G.bet;
     save.losses++; save.streak = 0;
   }
+  // Mojave Circuit: Elo-style rating swing, plus a caps bounty for upsets
+  let ratingDelta = 0, bounty = 0, newRank = 0;
+  if (G.rival != null) {
+    const rr = circuit().r[G.rival], pr = save.rating;
+    const exp = 1 / (1 + Math.pow(10, (rr - pr) / 400));
+    ratingDelta = Math.round(32 * ((won ? 1 : 0) - exp)) || (won ? 1 : -1);
+    if (won) { bounty = bountyFor(G.rival, G.bet); save.caps += bounty; }
+    save.rating = Math.max(600, pr + ratingDelta);
+    newRank = myRank();
+    save.circuitLog = [{
+      at: Date.now(),
+      txt: won ? `<b>You</b> beat ${RIVALS[G.rival].name} <i>+${ratingDelta}</i>`
+               : `${RIVALS[G.rival].name} beat <b>you</b> <i>${ratingDelta}</i>`,
+    }].concat(save.circuitLog || []).slice(0, 6);
+  }
   const cardKeys = won ? grantRandomCards(save.streak >= 3 ? 3 : 2) : [];
   const completed = checkChallenges();
   const xpGain = (won ? 90 + G.bet : 30) + completed.length * 60;
   const ups = awardXP(xpGain);
   persist();
   let rw = `<div class="rw-block"><span class="rw-title">+${xpGain} XP</span></div>`;
+  if (G.rival != null) {
+    rw += `<div class="rw-block"><span class="rw-title">Rating ${ratingDelta >= 0 ? '+' : ''}${ratingDelta} → #${newRank} · ${rankTitle(save.rating)}</span></div>`;
+    if (bounty) rw += `<div class="rw-block"><span class="rw-title bounty">Bounty +${bounty} caps${G.rival === markedRival() ? ' — marked rival' : ''}</span></div>`;
+  }
   if (cardKeys.length) rw += `<div class="rw-block"><span class="rw-title">New cards</span><div class="rw-chips">${rewardChipsHTML(cardKeys)}</div></div>`;
   for (const c of completed) rw += `<div class="rw-block"><span class="rw-title">Challenge complete — ${c.name}</span><div class="rw-chips">${rewardChipsHTML(c.keys)}</div></div>`;
   for (const u of ups) rw += `<div class="rw-block"><span class="rw-title lvlup">Level ${u.level} reached! +50 caps</span><div class="rw-chips">${rewardChipsHTML(u.keys)}</div></div>`;
@@ -907,7 +956,7 @@ function endMatch(winner, detail) {
     ? `You outbid ${G.oppName} and take the pot.`
     : `${G.oppName} takes the pot.`);
   const rc = $('result-caps');
-  rc.textContent = (won ? '+' : '−') + G.bet + ' ◉  →  ' + save.caps + ' caps';
+  rc.textContent = (won ? '+' + (G.bet + bounty) : '−' + G.bet) + ' ◉  →  ' + save.caps + ' caps';
   rc.className = 'result-caps ' + (won ? 'win' : 'lose');
   setTimeout(() => $('overlay-result').classList.add('active'), 600);
 }
@@ -1135,30 +1184,143 @@ function aiTurnStep() {
   }
 }
 
-/* ---------------- Leaderboard ---------------- */
-const NPC_BOARD = [
-  { name: 'Mr. House', caps: 2048, wins: 180 },
-  { name: 'Benny', caps: 990, wins: 77 },
-  { name: 'Cass', caps: 640, wins: 51 },
-  { name: 'Ringo', caps: 410, wins: 36 },
-  { name: 'Raul', caps: 230, wins: 22 },
-  { name: 'No-bark', caps: 95, wins: 8 },
+/* ---------------- The Mojave Circuit (living leaderboard) ----------------
+   Twelve rivals play each other on a fixed schedule: every 3h "tick" a few
+   seeded matches shift their Elo-style ratings. The sim is a pure function of
+   the clock (seeded RNG per tick), so the ladder moves while the app is closed
+   and computes identically on every device — no server needed. The player sits
+   on the same ladder via save.rating, updated after every AI match. */
+const CIRCUIT_EPOCH = Date.UTC(2026, 0, 1);
+const TICK_MS = 3 * 60 * 60 * 1000;
+const RIVALS = [
+  { name: 'Mr. House', base: 1430 },
+  { name: 'Vulpes',    base: 1350 },
+  { name: 'Benny',     base: 1290 },
+  { name: 'Swank',     base: 1230 },
+  { name: 'Veronica',  base: 1180 },
+  { name: 'Boone',     base: 1140 },
+  { name: 'Cass',      base: 1100 },
+  { name: 'Arcade',    base: 1060 },
+  { name: 'Ringo',     base: 1010 },
+  { name: 'Raul',      base: 960 },
+  { name: 'Easy Pete', base: 900 },
+  { name: 'No-bark',   base: 830 },
 ];
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function circuitTick() { return Math.max(1, Math.floor((Date.now() - CIRCUIT_EPOCH) / TICK_MS)); }
+let _circuit = null; // memoized per tick
+function circuit() {
+  const tick = circuitTick();
+  if (_circuit && _circuit.tick === tick) return _circuit;
+  const n = RIVALS.length;
+  const r = RIVALS.map(x => x.base);
+  const wins = RIVALS.map(x => Math.round(x.base / 9)); // lifetime wins seed
+  let prev = r.slice();
+  const events = [];
+  for (let t = 1; t <= tick; t++) {
+    const rng = mulberry32((t * 0x9E3779B9) >>> 0);
+    const games = 2 + Math.floor(rng() * 2);
+    for (let g = 0; g < games; g++) {
+      const i = Math.floor(rng() * n);
+      let j = Math.floor(rng() * (n - 1)); if (j >= i) j++;
+      const pi = 1 / (1 + Math.pow(10, (r[j] - r[i]) / 400));
+      const iWon = rng() < pi;
+      const d = Math.max(1, Math.round(28 * (iWon ? 1 - pi : pi)));
+      r[i] += iWon ? d : -d; r[j] += iWon ? -d : d;
+      wins[iWon ? i : j]++;
+      if (t > tick - 16) events.push({ at: CIRCUIT_EPOCH + t * TICK_MS, w: iWon ? i : j, l: iWon ? j : i, d });
+    }
+    for (let k = 0; k < n; k++) r[k] += (RIVALS[k].base - r[k]) * 0.02; // upsets fade over days
+    if (t === tick - 8) prev = r.slice(); // snapshot ~24h back, for movement arrows
+  }
+  _circuit = { tick, r: r.map(Math.round), prev: prev.map(Math.round), wins, events: events.reverse() };
+  return _circuit;
+}
+function markedRival() { // rival of the day — beating them pays double bounty
+  return Math.floor(mulberry32((Math.floor(Date.now() / 86400000) ^ 0x5F356495) >>> 0)() * RIVALS.length);
+}
+function ladder(ratings) {
+  const c = circuit();
+  const rows = RIVALS.map((x, i) => ({ i, name: x.name, rating: (ratings || c.r)[i], wins: c.wins[i] }));
+  rows.push({ me: true, name: save.name || 'Courier', rating: save.rating, wins: save.wins });
+  rows.sort((a, b) => b.rating - a.rating);
+  return rows;
+}
+function myRank(ratings) { return ladder(ratings).findIndex(x => x.me) + 1; }
+function rankTitle(rating) {
+  return rating >= 1350 ? 'Mojave Legend' : rating >= 1250 ? 'Caravan Master' :
+         rating >= 1150 ? 'High Roller' : rating >= 1050 ? 'Gambler' :
+         rating >= 950 ? 'Courier' : 'Drifter';
+}
+function rivalEps(idx) { // circuit rating → AI blunder rate
+  return Math.max(0.02, Math.min(0.5, (1470 - circuit().r[idx]) / 1400));
+}
+function bountyFor(idx, bet) { // extra caps for beating someone rated above you
+  const diff = circuit().r[idx] - save.rating;
+  let b = diff > 0 ? Math.round(bet * Math.min(1.5, diff / 150)) : 0;
+  if (idx === markedRival()) b = Math.max(b * 2, Math.round(bet * 0.5));
+  return b;
+}
+function pickRival(exclude) { // default opponent: someone near your rating
+  const near = RIVALS.map((x, i) => ({ i, d: Math.abs(circuit().r[i] - save.rating) }))
+    .filter(x => x.i !== exclude)
+    .sort((a, b) => a.d - b.d).slice(0, 4);
+  return near[Math.floor(Math.random() * near.length)].i;
+}
+function agoLabel(at) {
+  const m = Math.max(1, Math.round((Date.now() - at) / 60000));
+  return m < 60 ? m + 'm ago' : m < 2880 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago';
+}
 function renderLeaderboard() {
+  const c = circuit();
+  const rows = ladder();
+  const prevRows = ladder(c.prev);
+  const rank = rows.findIndex(x => x.me) + 1;
+  $('lb-title-chip').textContent = rankTitle(save.rating) + ' · ' + (save.name || 'Courier');
   $('lb-stats').innerHTML = `
-    <div class="lb-stat"><b>${save.level}</b><span>level</span></div>
+    <div class="lb-stat"><b>#${rank}</b><span>rank</span></div>
+    <div class="lb-stat"><b>${save.rating}</b><span>rating</span></div>
     <div class="lb-stat"><b>${save.wins}</b><span>wins</span></div>
-    <div class="lb-stat"><b>${save.losses}</b><span>losses</span></div>
     <div class="lb-stat"><b>${save.bestStreak}</b><span>best streak</span></div>`;
-  const rows = NPC_BOARD.concat([{ name: save.name || 'Courier', caps: save.caps, wins: save.wins, me: true }])
-    .sort((a, b) => b.caps - a.caps);
-  $('lb-table').innerHTML = rows.map((r, idx) => `
-    <div class="lb-row${r.me ? ' me' : ''}">
-      <span class="lb-rank">${idx + 1}</span>
-      <span class="lb-name">${r.name}${r.me ? ' — you' : ''}</span>
-      <span class="lb-sub">${r.wins} wins</span>
-      <span class="lb-caps">${r.caps} ◉</span>
-    </div>`).join('');
+  const away = $('lb-away');
+  if (save.lbSeen && save.lbSeen.rank !== rank && Date.now() - save.lbSeen.at > 3600000) {
+    const up = rank < save.lbSeen.rank;
+    away.innerHTML = `While you were away you ${up ? 'climbed' : 'slipped'}: <b>#${save.lbSeen.rank} → #${rank}</b>${up ? '' : ' — call someone out and win it back'}`;
+    away.className = 'lb-away ' + (up ? 'up' : 'down');
+  } else away.className = 'lb-away hidden';
+  save.lbSeen = { rank, at: Date.now() };
+  persist();
+  const marked = markedRival();
+  $('lb-table').innerHTML = rows.map((x, idx) => {
+    const was = prevRows.findIndex(p => p.me === x.me && (x.me || p.i === x.i));
+    const mv = was - idx;
+    const arrow = mv > 0 ? `<i class="mv up">▲${mv}</i>` : mv < 0 ? `<i class="mv down">▼${-mv}</i>` : '<i class="mv"></i>';
+    const chip = !x.me && x.i === marked ? '<span class="marked-chip">2× bounty</span>' : '';
+    return `
+    <div class="lb-row${x.me ? ' me' : ''}"${x.me ? '' : ` data-rival="${x.i}"`}>
+      <span class="lb-rank">${idx + 1}</span>${arrow}
+      <span class="lb-name">${x.name}${x.me ? ' — you' : ''}${chip}</span>
+      <span class="lb-sub">${x.wins} wins</span>
+      <span class="lb-caps">${x.rating}</span>
+    </div>`;
+  }).join('');
+  $('lb-table').onclick = e => {
+    const row = e.target.closest('[data-rival]');
+    if (row) openBetScreen(parseInt(row.dataset.rival, 10));
+  };
+  // live feed: simulated circuit results merged with your own recent matches
+  const feed = c.events.map(ev => ({ at: ev.at, txt: `<b>${RIVALS[ev.w].name}</b> beat ${RIVALS[ev.l].name} <i>+${ev.d}</i>` }))
+    .concat((save.circuitLog || []).map(x => ({ at: x.at, txt: x.txt, me: true })))
+    .sort((a, b) => b.at - a.at).slice(0, 10);
+  $('lb-feed').innerHTML = feed.map(f => `
+    <div class="feed-row${f.me ? ' me' : ''}"><span class="feed-txt">${f.txt}</span><span class="feed-when">${agoLabel(f.at)}</span></div>`).join('');
 }
 
 /* ---------------- Deck builder ---------------- */

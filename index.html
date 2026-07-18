@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.png">
 <title>Caravan — Card Game</title>
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=14">
 </head>
 <body data-theme="dark">
 
@@ -36,6 +36,7 @@
       <div class="xp-bar"><i id="xp-fill"></i></div>
       <span class="xp-label" id="xp-label">0 / 80</span>
     </div>
+    <div class="menu-ticker" id="menu-ticker"></div>
     <div class="menu-buttons">
       <button class="btn btn-primary" id="btn-play">Play</button>
       <button class="btn" id="btn-online">Online Multiplayer</button>
@@ -54,6 +55,7 @@
   <div class="menu-box">
     <h2>Place Your Bet</h2>
     <p class="bet-sub">Winner takes the pot. You have <b id="bet-caps">0</b> caps.</p>
+    <div class="bet-opp" id="bet-opp"></div>
     <div class="bet-options" id="bet-options"></div>
     <p class="deck-label">Choose your deck</p>
     <div class="deck-select" id="deck-select"></div>
@@ -114,9 +116,14 @@
 <!-- ============ LEADERBOARD ============ -->
 <div id="screen-leaderboard" class="screen">
   <div class="menu-box wide">
-    <h2>Leaderboard</h2>
+    <h2>The Mojave Circuit</h2>
+    <p class="lb-title-chip" id="lb-title-chip"></p>
+    <div class="lb-away hidden" id="lb-away"></div>
     <div class="lb-stats" id="lb-stats"></div>
+    <p class="feed-label">Standings — tap a rival to call them out</p>
     <div class="lb-table" id="lb-table"></div>
+    <p class="feed-label">The circuit, live</p>
+    <div class="lb-feed" id="lb-feed"></div>
     <div class="menu-buttons">
       <button class="btn btn-ghost" id="btn-lb-back">← Back</button>
     </div>
@@ -379,6 +386,6 @@
   </div>
 </div>
 
-<script src="game.js?v=10"></script>
+<script src="game.js?v=14"></script>
 </body>
 </html>
