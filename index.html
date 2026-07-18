@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Caravan">
+<meta name="theme-color" content="#14100b">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<title>Caravan — Card Game</title>
+<link rel="stylesheet" href="style.css?v=10">
+</head>
+<body data-theme="dark">
+
+<!-- ============ MAIN MENU ============ -->
+<div id="screen-menu" class="screen active">
+  <div class="menu-box">
+    <div class="game-logo">
+      <div class="logo-cards">
+        <div class="logo-card lc1">A♠</div>
+        <div class="logo-card lc2">K♦</div>
+        <div class="logo-card lc3">10♥</div>
+      </div>
+      <h1>CARAVAN</h1>
+      <p class="tagline">The Mojave's favorite card game</p>
+    </div>
+    <div class="caps-banner">
+      <span class="caps-icon">◉</span>
+      <span id="menu-caps">0</span> caps
+    </div>
+    <div class="level-banner">
+      <span class="level-chip" id="level-num">Lv 1</span>
+      <div class="xp-bar"><i id="xp-fill"></i></div>
+      <span class="xp-label" id="xp-label">0 / 80</span>
+    </div>
+    <div class="menu-buttons">
+      <button class="btn btn-primary" id="btn-play">Play</button>
+      <button class="btn" id="btn-online">Online Multiplayer</button>
+      <button class="btn" id="btn-decks">My Decks</button>
+      <button class="btn" id="btn-challenges">Challenges</button>
+      <button class="btn" id="btn-leaderboard">Leaderboard</button>
+      <button class="btn" id="btn-rules">How to Play</button>
+      <button class="btn" id="btn-settings">Settings</button>
+    </div>
+    <p class="menu-footer">All caps are in-game currency. No purchases, ever.</p>
+  </div>
+</div>
+
+<!-- ============ BET SCREEN ============ -->
+<div id="screen-bet" class="screen">
+  <div class="menu-box">
+    <h2>Place Your Bet</h2>
+    <p class="bet-sub">Winner takes the pot. You have <b id="bet-caps">0</b> caps.</p>
+    <div class="bet-options" id="bet-options"></div>
+    <p class="deck-label">Choose your deck</p>
+    <div class="deck-select" id="deck-select"></div>
+    <button class="btn small btn-ghost" id="btn-bet-editdecks" style="margin-top:8px">Edit decks →</button>
+    <div class="menu-buttons">
+      <button class="btn btn-primary" id="btn-start-match">Deal Cards</button>
+      <button class="btn btn-ghost" id="btn-bet-back">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ GAME SCREEN ============ -->
+<div id="screen-game" class="screen">
+  <div class="game-topbar">
+    <button class="topbtn" id="btn-quit" title="Forfeit match">✕</button>
+    <div class="pot-display">Pot: <b id="pot-amount">0</b> ◉</div>
+    <div class="turn-indicator" id="turn-indicator">Your turn</div>
+    <button class="topbtn wide" id="btn-log" title="Game log">Log</button>
+    <button class="topbtn" id="btn-help" title="Rules">?</button>
+  </div>
+
+  <div class="board" id="board">
+    <div class="opp-info">
+      <span class="opp-name" id="opp-name">Courier Six</span>
+      <span class="opp-cards" id="opp-hand-count">Hand 5 · Deck 0</span>
+    </div>
+
+    <div class="tracks" id="tracks">
+      <!-- 3 track columns injected by JS -->
+    </div>
+
+    <div class="message-bar" id="message-bar">Setup: play a number card on each of your caravans.</div>
+  </div>
+
+  <div class="hand-area">
+    <div class="hand-toolbar">
+      <div class="deck-pill">Deck <span id="deck-count">0</span></div>
+      <button class="action-btn" id="btn-discard" disabled>Discard a card</button>
+    </div>
+    <div class="hand" id="hand"></div>
+  </div>
+</div>
+
+<!-- ============ MATCH RESULT OVERLAY ============ -->
+<div id="overlay-result" class="overlay">
+  <div class="overlay-box">
+    <h2 id="result-title">You Win!</h2>
+    <p id="result-detail"></p>
+    <div class="result-caps" id="result-caps"></div>
+    <div class="result-rewards" id="result-rewards"></div>
+    <div class="menu-buttons">
+      <button class="btn btn-primary" id="btn-rematch">Play Again</button>
+      <button class="btn" id="btn-result-menu">Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ LEADERBOARD ============ -->
+<div id="screen-leaderboard" class="screen">
+  <div class="menu-box wide">
+    <h2>Leaderboard</h2>
+    <div class="lb-stats" id="lb-stats"></div>
+    <div class="lb-table" id="lb-table"></div>
+    <div class="menu-buttons">
+      <button class="btn btn-ghost" id="btn-lb-back">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DECK BUILDER ============ -->
+<div id="screen-decks" class="screen">
+  <div class="menu-box wide">
+    <h2>My Decks</h2>
+    <div class="deck-tabs" id="deck-tabs"></div>
+    <div class="deck-meta">
+      <span id="deck-count-label"></span>
+      <span class="deck-meta-btns">
+        <button class="btn small" id="btn-deck-fill">Add All</button>
+        <button class="btn small btn-ghost" id="btn-deck-clear">Clear</button>
+      </span>
+    </div>
+    <div class="coll-grid" id="coll-grid"></div>
+    <div class="menu-buttons">
+      <button class="btn btn-ghost" id="btn-decks-back">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CHALLENGES ============ -->
+<div id="screen-challenges" class="screen">
+  <div class="menu-box wide">
+    <h2>Challenges</h2>
+    <p class="bet-sub">Complete challenges to earn new cards for your collection.</p>
+    <div class="challenge-list" id="challenge-list"></div>
+    <div class="menu-buttons">
+      <button class="btn btn-ghost" id="btn-challenges-back">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SETTINGS ============ -->
+<div id="screen-settings" class="screen">
+  <div class="menu-box">
+    <h2>Settings</h2>
+    <div class="setting-row column">
+      <span>Theme</span>
+      <div class="theme-grid" id="theme-grid"></div>
+    </div>
+    <div class="setting-row">
+      <span>Player name</span>
+      <input type="text" id="input-name" maxlength="14" placeholder="Courier">
+    </div>
+    <div class="setting-row">
+      <span>Sound effects</span>
+      <div class="seg" id="seg-sound">
+        <button data-v="on" class="seg-btn">On</button>
+        <button data-v="off" class="seg-btn">Off</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <span>Music</span>
+      <div class="seg" id="seg-music">
+        <button data-v="on" class="seg-btn">On</button>
+        <button data-v="off" class="seg-btn">Off</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <span>Haptics</span>
+      <div class="seg" id="seg-haptics">
+        <button data-v="on" class="seg-btn">On</button>
+        <button data-v="off" class="seg-btn">Off</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <span>AI difficulty</span>
+      <div class="seg" id="seg-diff">
+        <button data-v="easy" class="seg-btn">Easy</button>
+        <button data-v="normal" class="seg-btn">Normal</button>
+        <button data-v="hard" class="seg-btn">Hard</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <span>Card animations</span>
+      <div class="seg" id="seg-anim">
+        <button data-anim="on" class="seg-btn">On</button>
+        <button data-anim="off" class="seg-btn">Off</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <span>Install as app</span>
+      <button class="btn small" id="btn-install">Install</button>
+    </div>
+    <div class="setting-row column">
+      <span>Account</span>
+      <div class="account-btns">
+        <button class="btn small" id="btn-login-google">Sign in with Google</button>
+        <button class="btn small" id="btn-login-apple">Sign in with Apple</button>
+        <button class="btn small" id="btn-login-gc">Game Center</button>
+      </div>
+      <p class="account-note" id="account-note"></p>
+    </div>
+    <div class="setting-row danger-row">
+      <span>Reset progress</span>
+      <button class="btn btn-danger small" id="btn-reset">Reset</button>
+    </div>
+    <div class="menu-buttons">
+      <button class="btn btn-ghost" id="btn-settings-back">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ RULES (slides) ============ -->
+<div id="screen-rules" class="screen">
+  <div class="menu-box wide rules-box">
+    <h2>How to Play</h2>
+    <div class="slides-viewport">
+      <div class="slides" id="slides">
+
+        <div class="slide">
+          <div class="slide-art">
+            <div class="sl-row">
+              <span class="sl-lane sold">22</span>
+              <span class="sl-lane sold">25</span>
+              <span class="sl-lane">18</span>
+            </div>
+            <div class="sl-caption">two of your three caravans sold</div>
+          </div>
+          <h3>The Goal</h3>
+          <p>Build three caravans (card piles) worth <b>21–26</b> — that's a <b>sold</b> caravan. Each caravan competes with the opponent's caravan in the same lane; the higher sold caravan wins the lane. <b>Win 2 of 3 lanes to take the pot.</b></p>
+        </div>
+
+        <div class="slide">
+          <div class="slide-art">
+            <div class="sl-row">
+              <span class="sl-card">4♠</span><span class="sl-arrow">→</span><span class="sl-slot">1</span>
+              <span class="sl-card red">9♦</span><span class="sl-arrow">→</span><span class="sl-slot">2</span>
+              <span class="sl-card">6♣</span><span class="sl-arrow">→</span><span class="sl-slot">3</span>
+            </div>
+            <div class="sl-caption">one number card on each empty caravan</div>
+          </div>
+          <h3>Setup</h3>
+          <p>You start with <b>8 cards</b>. Your first three turns must each place one <b>number card</b> (A–10) on an empty caravan of yours. After that you draw back up to 5 cards each turn.</p>
+        </div>
+
+        <div class="slide">
+          <div class="slide-art">
+            <div class="sl-row">
+              <span class="sl-card">3♠</span><span class="sl-card">7♠</span>
+              <span class="sl-gap"></span>
+              <span class="sl-card ok">9♣</span>
+              <span class="sl-card ok">5♠</span>
+              <span class="sl-card bad red">4♦</span>
+            </div>
+            <div class="sl-caption">3♠ → 7♠ is ascending: 9♣ continues up, 5♠ matches suit, 4♦ is illegal</div>
+          </div>
+          <h3>Number Cards</h3>
+          <p>Played only on <b>your own</b> caravans (Ace = 1). Two cards set a <b>direction</b>. The next card must continue the direction <b>or</b> match the top card's suit — and never repeat the same value.</p>
+        </div>
+
+        <div class="slide">
+          <div class="slide-art">
+            <div class="sl-row">
+              <span class="sl-card gone red">8♥<i class="sl-x">✕</i></span><span class="sl-chip">J</span>
+              <span class="sl-gap"></span>
+              <span class="sl-card red">8♥</span><span class="sl-chip gold">K</span><span class="sl-arrow">=</span><span class="sl-badge">16</span>
+            </div>
+            <div class="sl-caption">Jack removes · King doubles</div>
+          </div>
+          <h3>Jack &amp; King</h3>
+          <p>Face cards attach to any placed card — yours <b>or the opponent's</b>. A <b>Jack</b> removes the card it's played on. A <b>King</b> doubles that card's value, and Kings stack (8 → 16 → 32).</p>
+        </div>
+
+        <div class="slide">
+          <div class="slide-art">
+            <div class="sl-row">
+              <span class="sl-badge">▲</span><span class="sl-chip red">Q♥</span><span class="sl-arrow">→</span><span class="sl-badge">▼</span>
+              <span class="sl-gap"></span>
+              <span class="sl-card">A♠</span><span class="sl-chip purple">★</span><span class="sl-arrow">→</span><span class="sl-card gone">5♠<i class="sl-x">✕</i></span><span class="sl-card gone">9♠<i class="sl-x">✕</i></span>
+            </div>
+            <div class="sl-caption">Queen flips direction · Joker wipes matching cards</div>
+          </div>
+          <h3>Queen &amp; Joker</h3>
+          <p>A <b>Queen</b> goes on a caravan's top card: it reverses the direction and changes the suit to hers. A <b>Joker</b> on an <b>Ace</b> removes every other card of that suit on the table; on a <b>2–10</b> it removes every other card of that value.</p>
+        </div>
+
+        <div class="slide">
+          <div class="slide-art">
+            <div class="sl-row">
+              <span class="sl-badge">Bet 25</span><span class="sl-arrow">→</span><span class="sl-badge gold">Pot 50</span>
+            </div>
+            <div class="sl-caption">winner takes the pot — caps can't be bought</div>
+          </div>
+          <h3>Caps &amp; Extras</h3>
+          <p>Every match has a bet; the winner takes the pot. Instead of playing you may <b>discard</b> a card, or <b>disband</b> one of your caravans (tap its value badge). Over 26 is overburdened — fix it with a Jack or disband. Go broke and the house stakes you 50 caps.</p>
+        </div>
+
+      </div>
+    </div>
+    <div class="slide-nav">
+      <button class="slide-btn" id="slide-prev">‹</button>
+      <div class="slide-dots" id="slide-dots"></div>
+      <button class="slide-btn" id="slide-next">›</button>
+    </div>
+    <div class="menu-buttons">
+      <button class="btn btn-ghost" id="btn-rules-back">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ NAME PICKER (first launch) ============ -->
+<div id="overlay-name" class="overlay">
+  <div class="overlay-box">
+    <h2>Welcome, Courier</h2>
+    <p id="name-sub">Pick a unique name for the leaderboard.</p>
+    <input type="text" id="welcome-name" maxlength="14" placeholder="Your name" autocomplete="off">
+    <p class="name-error" id="name-error"></p>
+    <div class="menu-buttons">
+      <button class="btn btn-primary" id="btn-name-ok">Let's Play</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ONLINE MULTIPLAYER ============ -->
+<div id="screen-online" class="screen">
+  <div class="menu-box">
+    <h2>Online Multiplayer</h2>
+    <p class="bet-sub">Peer-to-peer over WebRTC — your game connects directly to your friend. Friendly matches, no caps at stake.</p>
+    <div id="online-choice" class="menu-buttons">
+      <button class="btn btn-primary" id="btn-quickmatch">Quick Match</button>
+      <button class="btn" id="btn-host">Host a Game</button>
+      <button class="btn" id="btn-join">Join a Game</button>
+    </div>
+    <div id="online-quick" hidden>
+      <div class="qm-spinner"></div>
+      <p class="bet-sub" id="quick-status">Searching for an opponent…</p>
+    </div>
+    <div id="online-host" hidden>
+      <p class="deck-label">Your game code</p>
+      <div class="game-code" id="game-code">······</div>
+      <p class="bet-sub" id="host-status">Share this code with your friend and wait…</p>
+    </div>
+    <div id="online-join" hidden>
+      <input type="text" id="join-code" maxlength="6" placeholder="GAME CODE" autocomplete="off" autocapitalize="characters">
+      <div class="menu-buttons">
+        <button class="btn btn-primary" id="btn-join-go">Connect</button>
+      </div>
+      <p class="bet-sub" id="join-status"></p>
+    </div>
+    <div class="menu-buttons">
+      <button class="btn btn-ghost" id="btn-online-back">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ GAME LOG ============ -->
+<div id="overlay-log" class="overlay">
+  <div class="overlay-box log-box">
+    <h2>Game Log</h2>
+    <div class="log-list" id="log-list"></div>
+    <div class="menu-buttons">
+      <button class="btn btn-ghost" id="btn-log-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="game.js?v=10"></script>
+</body>
+</html>
