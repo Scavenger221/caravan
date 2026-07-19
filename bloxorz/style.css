@@ -45,6 +45,7 @@ body {
   cursor: pointer;
 }
 .icon-btn:active { background: #1c2530; }
+.icon-btn.muted { color: #4a5461; text-decoration: line-through; }
 
 /* ---------- board ---------- */
 #board {

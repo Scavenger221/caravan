@@ -215,6 +215,88 @@ const LEVELS = [
       b: { bridges: ['2'], action: 'open' },
     },
   },
+  { // 16 — a fragile moat around the goal
+    code: '644208',
+    map: [
+      '######..##oo##',
+      '#S####..#oo#G#',
+      '##a###11#oo###',
+      '######..##oo##',
+      '######..######',
+    ],
+    switches: { a: { bridges: ['1'], action: 'toggle' } },
+  },
+  { // 17 — split, press both, drop through
+    code: '767053',
+    map: [
+      '######..##########',
+      '#S####..##########',
+      '##T###..#a######b#',
+      '............1.....',
+      '............2.....',
+      '..........#####...',
+      '..........##G##...',
+      '..........#####...',
+    ],
+    tele: [[8, 0], [17, 2]],
+    switches: {
+      a: { bridges: ['1'], action: 'open' },
+      b: { bridges: ['2'], action: 'open' },
+    },
+  },
+  { // 18 — the orange stair
+    code: '287029',
+    map: [
+      '..####........',
+      '..#S##........',
+      '..####........',
+      '...oo.........',
+      '...oo.........',
+      '..#####.......',
+      '..##o##.......',
+      '...#o#oo......',
+      '...#o#oo......',
+      '...####oo##...',
+      '......#oo##...',
+      '......##G##...',
+      '......#####...',
+    ],
+  },
+  { // 19 — bridge relay
+    code: '405643',
+    map: [
+      '######..####..###..###',
+      '#S####..####..###..###',
+      '######11#b##22#A#33#G#',
+      '######..####..###..###',
+      '######..####..###..###',
+    ],
+    switches: {
+      b: { bridges: ['1', '2'], action: 'toggle' },
+      A: { bridges: ['3'], action: 'open' },
+    },
+    bridgesOpen: { '1': true },
+  },
+  { // 20 — the whole toolbox
+    code: '860572',
+    map: [
+      '#####...###.####',
+      '#S###...#a#1####',
+      '##T##...###.#A##',
+      '#####.......####',
+      '............####',
+      '..............2.',
+      '..............2.',
+      '..........######',
+      '..........#ooG##',
+      '..........######',
+    ],
+    tele: [[8, 0], [15, 4]],
+    switches: {
+      a: { bridges: ['1'], action: 'open' },
+      A: { bridges: ['2'], action: 'open' },
+    },
+  },
 ];
 
 /* ================================ ENGINE ================================ */
@@ -417,6 +499,7 @@ let queued = null;     // one buffered input
 let view = null;       // projection params
 
 /* ---------- sound (WebAudio, generated) ---------- */
+let soundOn = save.sound !== false;
 let AC = null;
 function ac() {
   if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
@@ -424,6 +507,7 @@ function ac() {
   return AC;
 }
 function tone(freq, dur, type, vol, when) {
+  if (!soundOn) return;
   const a = ac(); if (!a) return;
   const t = a.currentTime + (when || 0);
   const o = a.createOscillator(), g = a.createGain();
@@ -459,7 +543,7 @@ function computeView() {
   const cw = cv.width, ch = cv.height;
   const pad = Math.min(cw, ch) * 0.07;
   // X = (x - y) * ux ; Y = (x + y) * uy - z * uz
-  const RY = 0.52, RZ = 0.74;
+  const RY = 0.52, RZ = 0.96;
   const s = Math.min(
     (cw - pad * 2) / (W + H),
     (ch - pad * 2) / ((W + H) * RY + (2 + THICK) * RZ)
@@ -863,6 +947,15 @@ cv.addEventListener('touchend', e => {
 }, { passive: true });
 
 /* ---------- buttons / screens ---------- */
+$('btnSound').addEventListener('click', () => {
+  soundOn = !soundOn;
+  save.sound = soundOn;
+  persist();
+  $('btnSound').classList.toggle('muted', !soundOn);
+  if (soundOn) snd.switch();
+});
+$('btnSound').classList.toggle('muted', !soundOn);
+
 $('btnReset').addEventListener('click', () => { if (S) startLevel(S.li); });
 $('btnLevels').addEventListener('click', () => { buildLevelGrid(); show('levels'); });
 $('btnCloseLevels').addEventListener('click', () => hide('levels'));
