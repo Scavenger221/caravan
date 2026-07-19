@@ -50,6 +50,20 @@ no backend). Owner plays it on iPhone as a home-screen app.
 - PeerJS cloud was tried and REPLACED by Trystero (broker was unreliable).
 - Owner's GitHub: Scavenger221. gh CLI is authenticated on the home PC (keyring).
 
+## bloxorz/ — separate mini-app
+- `bloxorz/` is a self-contained Bloxorz-style block-rolling puzzle PWA (portrait-only),
+  same no-build philosophy. Once on `main` it lives at
+  https://scavenger221.github.io/caravan/bloxorz/.
+- It has its OWN cache busting, independent of caravan's: `bloxorz/index.html` loads
+  `style.css?v=N` + `game.js?v=N`, and `bloxorz/sw.js` has matching `CACHE='bloxorz-vN'`
+  + versioned ASSETS. Bump all together on every bloxorz change.
+- `bloxorz/game.js` keeps the engine DOM-free: under node it exports
+  `{LEVELS, DIRS, initState, tryMove, cloneState}` so levels can be BFS-verified solvable.
+  Any new/edited level MUST pass such a solver before shipping.
+- Mechanics: 1x1x2 block rolls; fragile `o` tiles break under a standing block; soft
+  (a-d, any contact) / hard (A-D, standing only) switches drive bridge groups 1-4;
+  `T` splits the block into two cubes that rejoin when adjacent; win = standing on `G`.
+
 ## Testing without a device
 Serve locally (`python -m http.server`), then drive the game from the console: the engine and
 DOM are all global (`G`, `save`, `legalTargets`, `applyMove`...). An auto-play loop that picks
