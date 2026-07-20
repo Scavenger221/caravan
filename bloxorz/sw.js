@@ -1,9 +1,9 @@
-const CACHE = 'bloxorz-v6';
+const CACHE = 'bloxorz-v7';
 const ASSETS = [
   './',
   'index.html',
-  'style.css?v=6',
-  'game.js?v=6',
+  'style.css?v=7',
+  'game.js?v=7',
   'manifest.json',
   'icon-180.png',
   'icon-192.png',

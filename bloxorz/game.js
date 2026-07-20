@@ -503,6 +503,49 @@ let heldDir = null;    // held pad/key: keeps rolling while held
 let history = [];      // undo stack (survives a fall, so you can undo the fatal move)
 let view = null;       // projection params
 
+/* ---------- themes ---------- */
+const THEMES = {
+  slate: {   // the cool dark default
+    tileA: '#9aa5b1', tileB: '#8d98a5', frA: '#d08a2e', frB: '#c47f27',
+    brA: '#6f96ac', brB: '#648ba1', block: '#d6a032', cube: '#8d7a4e',
+    blockOutline: '#221405', cubeOutline: '#15100a',
+    tileEdge: '#0b0e13', sideEdge: '#05070a',
+    hole: '#040507', holeRim: '#2a3340',
+    swFill: '#3d4653', swRim: '#12161d', hardX: '#2a313c',
+    tel: '#e8edf3', closedBr: '#5a7d93',
+  },
+  classic: { // warm palette in the spirit of the old flash puzzlers
+    tileA: '#cfc9ba', tileB: '#c1bbac', frA: '#e0821a', frB: '#d17714',
+    brA: '#8fa3ad', brB: '#83979f', block: '#b9873a', cube: '#7d6b45',
+    blockOutline: '#241503', cubeOutline: '#171006',
+    tileEdge: '#171208', sideEdge: '#0c0904',
+    hole: '#070502', holeRim: '#4c4234',
+    swFill: '#4c463a', swRim: '#171208', hardX: '#3c362b',
+    tel: '#f4efe4', closedBr: '#8fa3ad',
+  },
+  mono: {    // black & white
+    tileA: '#d8d8d8', tileB: '#c9c9c9', frA: '#7f7f7f', frB: '#747474',
+    brA: '#ffffff', brB: '#f2f2f2', block: '#fafafa', cube: '#9a9a9a',
+    blockOutline: '#0a0a0a', cubeOutline: '#0a0a0a',
+    tileEdge: '#000000', sideEdge: '#000000',
+    hole: '#000000', holeRim: '#5a5a5a',
+    swFill: '#2e2e2e', swRim: '#000000', hardX: '#1a1a1a',
+    tel: '#111111', closedBr: '#9a9a9a',
+  },
+};
+let theme = THEMES[save.theme] || THEMES.slate;
+
+function setTheme(name) {
+  if (!THEMES[name]) return;
+  theme = THEMES[name];
+  save.theme = name;
+  persist();
+  document.body.dataset.theme = name;
+  document.querySelectorAll('.themebtn').forEach(b =>
+    b.classList.toggle('active', b.dataset.theme === name));
+  if (S) draw();
+}
+
 /* ---------- sound (WebAudio, generated) ---------- */
 let soundOn = save.sound !== false;
 let AC = null;
@@ -596,17 +639,17 @@ function drawSlab(x, y, top, dropZ, alpha) {
         C = proj(x + 1, y + 1, z0), D = proj(x, y + 1, z0);
   const Bt = proj(x + 1, y, z0 - THICK), Ct = proj(x + 1, y + 1, z0 - THICK),
         Dt = proj(x, y + 1, z0 - THICK);
-  poly([D, C, Ct, Dt], shade(top, 0.55), '#05070a', 1);   // front-left face
-  poly([B, C, Ct, Bt], shade(top, 0.42), '#05070a', 1);   // front-right face
-  poly([A, B, C, D], top, '#0b0e13', 1.5);                // top
+  poly([D, C, Ct, Dt], shade(top, 0.55), theme.sideEdge, 1);   // front-left face
+  poly([B, C, Ct, Bt], shade(top, 0.42), theme.sideEdge, 1);   // front-right face
+  poly([A, B, C, D], top, theme.tileEdge, 1.5);                // top
   ctx.globalAlpha = 1;
 }
 
 function tileTopColor(ch, x, y) {
   const alt = (x + y) % 2 === 0;
-  if (ch === 'o') return alt ? '#d08a2e' : '#c47f27';
-  if (ch >= '1' && ch <= '4') return alt ? '#6f96ac' : '#648ba1';
-  return alt ? '#9aa5b1' : '#8d98a5';
+  if (ch === 'o') return alt ? theme.frA : theme.frB;
+  if (ch >= '1' && ch <= '4') return alt ? theme.brA : theme.brB;
+  return alt ? theme.tileA : theme.tileB;
 }
 
 function drawGlyphs(ch, x, y) {
@@ -616,15 +659,15 @@ function drawGlyphs(ch, x, y) {
     const m = 0.2;
     poly([proj(x + m, y + m, 0), proj(x + 1 - m, y + m, 0),
           proj(x + 1 - m, y + 1 - m, 0), proj(x + m, y + 1 - m, 0)],
-      '#040507', '#2a3340', 1.5);
+      theme.hole, theme.holeRim, 1.5);
   } else if (ch >= 'a' && ch <= 'd') {
     ctx.beginPath();
     ctx.ellipse(c[0], c[1], view.ux * 0.26, view.uy * 0.26, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#3d4653'; ctx.fill();
-    ctx.strokeStyle = '#12161d'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = theme.swFill; ctx.fill();
+    ctx.strokeStyle = theme.swRim; ctx.lineWidth = 2; ctx.stroke();
   } else if (ch >= 'A' && ch <= 'D') {
     const m = 0.24;
-    ctx.strokeStyle = '#2a313c'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+    ctx.strokeStyle = theme.hardX; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
     ctx.beginPath();
     let p = proj(x + m, y + m, 0); ctx.moveTo(p[0], p[1]);
     p = proj(x + 1 - m, y + 1 - m, 0); ctx.lineTo(p[0], p[1]);
@@ -636,7 +679,7 @@ function drawGlyphs(ch, x, y) {
       const q = proj(x + ox, y + oy, 0);
       ctx.beginPath();
       ctx.ellipse(q[0], q[1], view.ux * 0.11, view.uy * 0.11, 0, 0, Math.PI * 2);
-      ctx.fillStyle = '#e8edf3'; ctx.fill();
+      ctx.fillStyle = theme.tel; ctx.fill();
     }
   }
 }
@@ -711,7 +754,7 @@ function renderTile(x, y, ch) {
     // closed bridge: faint outline only
     ctx.globalAlpha = 0.18;
     poly([proj(x, y, 0), proj(x + 1, y, 0), proj(x + 1, y + 1, 0), proj(x, y + 1, 0)],
-      null, '#5a7d93', 1.5);
+      null, theme.closedBr, 1.5);
     ctx.globalAlpha = 1;
     return;
   }
@@ -755,7 +798,7 @@ function draw() {
 }
 
 function drawEntities() {
-  const BLOCK = '#d6a032', CUBE_IDLE = '#8d7a4e';
+  const BLOCK = theme.block, CUBE_IDLE = theme.cube;
   if (anim && anim.type === 'crumble') return; // the block already fell
   if (anim && anim.type === 'build') {
     // the block (or cubes) drops in along with its own row of tiles
@@ -768,7 +811,7 @@ function drawEntities() {
       const fx = tileFxAt(b.x, b.y);
       if (fx && fx.p <= 0) continue;
       const dz = fx ? fx.dz : 0, al = fx ? fx.alpha : 1;
-      drawBox(boxCorners(b).map(p => [p[0], p[1], p[2] - dz]), col, '#221405', al);
+      drawBox(boxCorners(b).map(p => [p[0], p[1], p[2] - dz]), col, theme.blockOutline, al);
     }
     return;
   }
@@ -777,24 +820,24 @@ function drawEntities() {
     const th = Math.pow(anim.t, 1.55) * Math.PI / 2;
     const cs = rotateCorners(boxCorners(anim.from), anim.dir, anim.pivot, th);
     drawOthers(anim.who, BLOCK, CUBE_IDLE);
-    drawBox(cs, anim.who === 'box' || anim.who === S.active ? BLOCK : CUBE_IDLE, '#221405');
+    drawBox(cs, anim.who === 'box' || anim.who === S.active ? BLOCK : CUBE_IDLE, theme.blockOutline);
   } else if (anim && (anim.type === 'fall' || anim.type === 'fallBreak')) {
     let cs = anim.pose.map(p => [p[0], p[1], p[2] - anim.zoff]);
     drawOthers(anim.who, BLOCK, CUBE_IDLE);
-    drawBox(cs, BLOCK, '#221405', Math.max(0, 1 - anim.t * anim.t));
+    drawBox(cs, BLOCK, theme.blockOutline, Math.max(0, 1 - anim.t * anim.t));
   } else if (anim && anim.type === 'sink') {
     const b = { ...S.box, dz: S.box.dz };
     const cs = boxCorners(b).map(p => [p[0], p[1], p[2] - anim.t * 2.2]);
-    drawBox(cs, BLOCK, '#221405', Math.max(0, 1 - anim.t));
+    drawBox(cs, BLOCK, theme.blockOutline, Math.max(0, 1 - anim.t));
   } else if (S.mode === 'block') {
-    drawBox(boxCorners(S.box), BLOCK, '#221405');
+    drawBox(boxCorners(S.box), BLOCK, theme.blockOutline);
   } else {
     const order = [...S.cubes.keys()].sort((a, b) =>
       (S.cubes[a].x + S.cubes[a].y) - (S.cubes[b].x + S.cubes[b].y));
     for (const i of order) {
       const c = S.cubes[i];
       drawBox(boxCorners({ x: c.x, y: c.y, dx: 1, dy: 1, dz: 1 }),
-        i === S.active ? BLOCK : CUBE_IDLE, i === S.active ? '#221405' : '#15100a');
+        i === S.active ? BLOCK : CUBE_IDLE, i === S.active ? theme.blockOutline : theme.cubeOutline);
     }
   }
 }
@@ -806,7 +849,7 @@ function drawOthers(who, BLOCK, CUBE_IDLE) {
   const c = S.cubes[other];
   if (!c) return;
   drawBox(boxCorners({ x: c.x, y: c.y, dx: 1, dy: 1, dz: 1 }),
-    other === S.active ? BLOCK : CUBE_IDLE, '#15100a');
+    other === S.active ? BLOCK : CUBE_IDLE, theme.cubeOutline);
 }
 
 /* ---------- animation / game flow ---------- */
@@ -1120,6 +1163,10 @@ $('btnNext').addEventListener('click', () => {
   if (S.li === LEVELS.length - 1) { buildLevelGrid(); show('levels'); }
   else startLevel(S.li + 1);
 });
+document.querySelectorAll('.themebtn').forEach(b => {
+  b.addEventListener('click', () => setTheme(b.dataset.theme));
+});
+
 $('btnCode').addEventListener('click', () => {
   const v = $('codeInput').value.trim();
   const idx = LEVELS.findIndex(L => L.code === v);
@@ -1145,6 +1192,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
+setTheme(save.theme && THEMES[save.theme] ? save.theme : 'slate');
 show('intro');
 S = initState(Math.min(save.unlocked, LEVELS.length - 1));
 computeView(); updateHud(); updateSwap(); draw();
