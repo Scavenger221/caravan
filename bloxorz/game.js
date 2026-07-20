@@ -549,11 +549,12 @@ function setTheme(name) {
     // patchy rust: broad orange oxide blotches and blue-grey metal spots
     // over dark brown, plus a fine grain pass on top
     theme.blockNoise = makeBlotchPattern(null, [
-      ['#c06430', 26, 7, 0.40],
-      ['#d47a38', 16, 5, 0.34],
-      ['#5b5c66', 14, 5, 0.22],
-      ['#2a1209', 14, 5, 0.24],
-      ['#e89048', 10, 3, 0.28],
+      ['#b85e2c', 10, 16, 0.55],  // broad rust clouds
+      ['#cf7233', 16, 8, 0.55],   // medium patches
+      ['#565d6e', 10, 9, 0.38],   // cool blue-grey metal
+      ['#22100a', 12, 8, 0.42],   // dark scorch
+      ['#ec9448', 18, 3.5, 0.55], // bright oxide flecks
+      ['#f7ae60', 12, 1.8, 0.55], // fine highlights
     ]);
     theme.tileNoise = makeNoisePattern([
       ['#8e8f87', 150, 0.4, 1.2, 0.20],
@@ -671,30 +672,38 @@ function makeNoisePattern(dots) {
   return ctx.createPattern(c, 'repeat');
 }
 
-// Irregular blotch texture: clusters of overlapping circles, for patchy
-// rust rather than uniform speckle.
+// Irregular blotch texture: soft-edged radial blobs at several scales,
+// so rust reads as cloudy patches rather than dots.
 function makeBlotchPattern(base, blobs) {
+  const SZ = 128;
   const c = document.createElement('canvas');
-  c.width = c.height = 128;
+  c.width = c.height = SZ;
   const g = c.getContext('2d');
   let seed = 424242;
   const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  if (base) { g.fillStyle = base; g.fillRect(0, 0, 128, 128); }
+  if (base) { g.fillStyle = base; g.fillRect(0, 0, SZ, SZ); }
+  const hexRgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
   for (const [color, count, blobR, alpha] of blobs) {
-    g.fillStyle = color;
+    const [r, gg, b] = hexRgb(color);
     for (let i = 0; i < count; i++) {
-      const bx = rnd() * 128, by = rnd() * 128;
-      const parts = 5 + Math.floor(rnd() * 7);
-      g.globalAlpha = alpha * (0.6 + rnd() * 0.4);
+      const parts = 3 + Math.floor(rnd() * 5);
+      const bx = rnd() * SZ, by = rnd() * SZ;
       for (let j = 0; j < parts; j++) {
+        const px = bx + (rnd() - 0.5) * blobR * 2.4;
+        const py = by + (rnd() - 0.5) * blobR * 2.4;
+        const pr = blobR * (0.5 + rnd() * 0.9);
+        const a = alpha * (0.55 + rnd() * 0.45);
+        const grad = g.createRadialGradient(px, py, 0, px, py, pr);
+        grad.addColorStop(0, `rgba(${r},${gg},${b},${a})`);
+        grad.addColorStop(0.6, `rgba(${r},${gg},${b},${a * 0.55})`);
+        grad.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+        g.fillStyle = grad;
         g.beginPath();
-        g.arc(bx + (rnd() - 0.5) * blobR * 2.2, by + (rnd() - 0.5) * blobR * 2.2,
-              blobR * (0.3 + rnd() * 0.7), 0, Math.PI * 2);
+        g.arc(px, py, pr, 0, Math.PI * 2);
         g.fill();
       }
     }
   }
-  g.globalAlpha = 1;
   return ctx.createPattern(c, 'repeat');
 }
 
@@ -842,7 +851,7 @@ function drawBox(cs, base, outline, alpha) {
       ctx.moveTo(pts[0][0], pts[0][1]);
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
       ctx.closePath();
-      texFill(theme.blockNoise, 0.5 + 0.4 * lum);
+      texFill(theme.blockNoise, 0.7 + 0.3 * lum);
     }
   }
   ctx.globalAlpha = 1;
