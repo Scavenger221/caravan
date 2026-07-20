@@ -500,7 +500,6 @@ let falls = 0;         // falls on the current stage
 let anim = null;       // active animation
 let queued = [];       // buffered inputs (so quick swipes chain smoothly)
 let heldDir = null;    // held pad/key: keeps rolling while held
-let history = [];      // undo stack (survives a fall, so you can undo the fatal move)
 let view = null;       // projection params
 
 /* ---------- themes ---------- */
@@ -1125,8 +1124,6 @@ function step(dirName) {
 function applyPending() {
   const r = pending; pending = null;
   const evs = r.events;
-  history.push(cloneState(S));
-  if (history.length > 300) history.shift();
   S = r.state;
   updateHud();
 
@@ -1239,19 +1236,10 @@ function levelComplete() {
 function startLevel(li) {
   S = initState(li);
   falls = 0; anim = null; queued = []; pending = null; heldDir = null;
-  history = [];
   save.last = li;   // resume here on the next launch
   persist();
   computeView(); updateHud(); updateSwap();
   startBuild();
-}
-
-function undo() {
-  if (!S || anim || S.status !== 'play' || !history.length) return;
-  S = history.pop();
-  S.status = 'play';
-  queued = []; heldDir = null;
-  updateHud(); updateSwap(); draw();
 }
 
 /* ---------- HUD / overlays ---------- */
@@ -1260,7 +1248,6 @@ function updateHud() {
     'STAGE ' + String(S.li + 1).padStart(2, '0') + '/' + LEVELS.length;
   $('hudMoves').textContent = S.moves;
   $('hudFalls').textContent = falls;
-  $('btnUndo').classList.toggle('disabled', !history.length);
 }
 function updateSwap() {
   $('btnSwap').classList.toggle('hidden', !S || S.mode !== 'split');
@@ -1311,7 +1298,6 @@ document.addEventListener('keydown', e => {
   } else if (k === ' ' || k === 'Enter') {
     if (S && S.mode === 'split' && !anim) { S.active = 1 - S.active; draw(); }
   } else if (k === 'r') { startLevel(S.li); }
-  else if (k === 'z' || k === 'u') { undo(); }
 });
 document.addEventListener('keyup', e => {
   if (KEYMAP[e.key] === heldDir) heldDir = null;
@@ -1404,7 +1390,6 @@ document.querySelectorAll('.ctlbtn').forEach(b => {
 });
 
 $('btnReset').addEventListener('click', () => { if (S) startLevel(S.li); });
-$('btnUndo').addEventListener('click', undo);
 
 // keep the screen awake during play (supported on iOS 16.4+; harmless elsewhere)
 let wakeLock = null;
@@ -1468,6 +1453,14 @@ resize();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
+  // when an updated service worker takes over, reload once so the fresh
+  // files land immediately instead of one launch behind
+  let refreshed = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshed) return;
+    refreshed = true;
+    location.reload();
+  });
 }
 
 setTheme(save.theme && THEMES[save.theme] ? save.theme : 'slate');
