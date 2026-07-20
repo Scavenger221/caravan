@@ -294,6 +294,14 @@ body {
   cursor: pointer;
 }
 
+/* one-hand mode: swipe-driven, the d-pad collapses to just the swap button */
+body[data-controls='onehand'] #dpad { display: flex; }
+body[data-controls='onehand'] #dpad .pad.nw,
+body[data-controls='onehand'] #dpad .pad.ne,
+body[data-controls='onehand'] #dpad .pad.sw,
+body[data-controls='onehand'] #dpad .pad.se { display: none; }
+body[data-controls='onehand'] #ctlRow { gap: 26px; }
+
 /* settings */
 .setlabel {
   font-size: 10px;
@@ -320,6 +328,19 @@ body {
   cursor: pointer;
 }
 .themebtn.active { border-color: var(--accent-dim); color: var(--accent); }
+.ctlbtn {
+  flex: 1;
+  padding: 10px 0;
+  border: 1px solid #2a3340;
+  border-radius: 10px;
+  background: #131922;
+  color: #8d98a5;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+}
+.ctlbtn.active { border-color: var(--accent-dim); color: var(--accent); }
 
 /* stage complete */
 .doneStats { display: flex; justify-content: center; gap: 30px; margin-bottom: 14px; }

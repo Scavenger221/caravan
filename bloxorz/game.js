@@ -1144,6 +1144,21 @@ updateSoundBtn();
 $('btnSettings').addEventListener('click', () => show('settings'));
 $('btnCloseSettings').addEventListener('click', () => hide('settings'));
 
+function setControls(mode) {
+  if (mode !== 'pads' && mode !== 'onehand') mode = 'pads';
+  save.controls = mode;
+  persist();
+  document.body.dataset.controls = mode;
+  document.querySelectorAll('.ctlbtn').forEach(b =>
+    b.classList.toggle('active', b.dataset.controls === mode));
+  $('hint').textContent = mode === 'onehand'
+    ? 'swipe anywhere to roll — tap the board to swap'
+    : 'swipe or tap — arrows match the board';
+}
+document.querySelectorAll('.ctlbtn').forEach(b => {
+  b.addEventListener('click', () => setControls(b.dataset.controls));
+});
+
 $('btnReset').addEventListener('click', () => { if (S) startLevel(S.li); });
 $('btnUndo').addEventListener('click', undo);
 
@@ -1200,6 +1215,7 @@ if ('serviceWorker' in navigator) {
 }
 
 setTheme(save.theme && THEMES[save.theme] ? save.theme : 'slate');
+setControls(save.controls || 'pads');
 show('intro');
 S = initState(Math.min(save.unlocked, LEVELS.length - 1));
 computeView(); updateHud(); updateSwap(); draw();
