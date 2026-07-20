@@ -25,26 +25,47 @@ body {
 #hud {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px 6px;
+  gap: 8px;
+  padding: 12px 10px 8px;
+}
+.stage {
+  font-weight: 800;
+  font-size: 13px;
   letter-spacing: 0.12em;
+  color: #d6a032;
+  white-space: nowrap;
 }
-.hud-left { font-weight: 700; font-size: 15px; color: #e8edf3; }
-.hud-mid { display: flex; gap: 18px; }
-.stat { text-align: center; }
-.stat span { display: block; font-size: 17px; font-weight: 700; color: #e8edf3; }
-.stat label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.18em; color: #6d7885; }
-.hud-right { display: flex; gap: 8px; }
+.hud-stats { display: flex; gap: 5px; margin-left: auto; }
+.chip {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  background: #11161d;
+  border: 1px solid #212a35;
+  border-radius: 999px;
+  padding: 5px 9px;
+}
+.chip label { font-size: 8px; letter-spacing: 0.12em; color: #67727f; }
+.chip span {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e8edf3;
+  font-variant-numeric: tabular-nums;
+  min-width: 2ch;
+  text-align: right;
+}
+.hud-right { display: flex; gap: 5px; }
 .icon-btn {
-  width: 38px; height: 38px;
-  border: 1px solid #2a3340;
-  border-radius: 9px;
-  background: #131922;
-  color: #cfd6de;
-  font-size: 17px;
+  width: 34px; height: 34px;
+  border: 1px solid #212a35;
+  border-radius: 50%;
+  background: #11161d;
+  color: #aeb8c4;
+  font-size: 16px;
   cursor: pointer;
+  transition: transform 0.08s;
 }
-.icon-btn:active { background: #1c2530; }
+.icon-btn:active { background: #1c2530; transform: scale(0.92); }
 .icon-btn.muted { color: #4a5461; text-decoration: line-through; }
 
 /* ---------- board ---------- */
@@ -56,27 +77,47 @@ body {
 }
 
 /* ---------- controls ---------- */
-#controls { display: flex; justify-content: center; padding: 4px 0 14px; }
+#controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 12px;
+}
+/* the four pads sit at the corners of an X, matching the board's axes */
 #dpad {
   display: grid;
-  grid-template-columns: repeat(3, 58px);
-  grid-template-rows: repeat(3, 46px);
-  gap: 6px;
+  grid-template-columns: repeat(3, 62px);
+  grid-template-rows: repeat(3, 52px);
+  gap: 7px;
 }
 .pad {
   border: 1px solid #2a3340;
-  border-radius: 11px;
-  background: #131922;
-  color: #aeb8c4;
-  font-size: 15px;
+  border-radius: 14px;
+  background: #141a23;
+  color: #cfd6de;
+  font-size: 21px;
   cursor: pointer;
+  transition: transform 0.08s;
 }
-.pad:active { background: #24303f; }
-.pad.up { grid-area: 1 / 2; }
-.pad.left { grid-area: 2 / 1; }
-.pad.mid { grid-area: 2 / 2; color: #d6a032; border-color: #5c4715; font-size: 19px; }
-.pad.right { grid-area: 2 / 3; }
-.pad.down { grid-area: 3 / 2; }
+.pad:active { background: #26313f; transform: scale(0.9); }
+.pad.nw { grid-area: 1 / 1; }
+.pad.ne { grid-area: 1 / 3; }
+.pad.sw { grid-area: 3 / 1; }
+.pad.se { grid-area: 3 / 3; }
+.pad.mid {
+  grid-area: 2 / 2;
+  border-radius: 50%;
+  color: #d6a032;
+  border-color: #5c4715;
+  font-size: 20px;
+}
+#hint {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: #4a5461;
+  text-transform: uppercase;
+}
 .hidden { visibility: hidden; }
 
 /* ---------- toast ---------- */

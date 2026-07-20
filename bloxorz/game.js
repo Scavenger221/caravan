@@ -495,7 +495,7 @@ function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save));
 let S = null;          // engine state
 let falls = 0;         // falls on the current stage
 let anim = null;       // active animation
-let queued = null;     // one buffered input
+let queued = [];       // buffered inputs (so quick swipes chain smoothly)
 let view = null;       // projection params
 
 /* ---------- sound (WebAudio, generated) ---------- */
@@ -722,7 +722,9 @@ function draw() {
   // block / cubes
   const BLOCK = '#d6a032', CUBE_IDLE = '#8d7a4e';
   if (anim && (anim.type === 'roll')) {
-    const cs = rotateCorners(boxCorners(anim.from), anim.dir, anim.pivot, anim.t * Math.PI / 2);
+    // ease-in: the block tips slowly then falls onto its face, like gravity
+    const th = Math.pow(anim.t, 1.55) * Math.PI / 2;
+    const cs = rotateCorners(boxCorners(anim.from), anim.dir, anim.pivot, th);
     drawOthers(anim.who, BLOCK, CUBE_IDLE);
     drawBox(cs, anim.who === 'box' || anim.who === S.active ? BLOCK : CUBE_IDLE, '#221405');
   } else if (anim && (anim.type === 'fall' || anim.type === 'fallBreak')) {
@@ -757,7 +759,7 @@ function drawOthers(who, BLOCK, CUBE_IDLE) {
 }
 
 /* ---------- animation / game flow ---------- */
-const ROLL_MS = 130, FALL_MS = 650, SINK_MS = 550;
+const ROLL_MS = 150, FALL_MS = 650, SINK_MS = 550;
 
 function pivotFor(from, dir) {
   if (dir === 'right') return from.x + from.dx;
@@ -770,7 +772,7 @@ let pending = null; // {state, events} applied when roll anim ends
 
 function step(dirName) {
   if (!S || S.status !== 'play') return;
-  if (anim) { queued = dirName; return; }
+  if (anim) { if (queued.length < 2) queued.push(dirName); return; }
   const r = tryMove(S, dirName);
   if (!r) return;
   const rollEv = r.events[0];
@@ -813,7 +815,7 @@ function applyPending() {
     requestAnimationFrame(tick);
     return;
   }
-  if (queued) { const q = queued; queued = null; step(q); }
+  if (queued.length) step(queued.shift());
 }
 
 function lastPose(r) {
@@ -835,7 +837,7 @@ function tick(now) {
   if (was === 'roll') { applyPending(); draw(); return; }
   if (was === 'fall' || was === 'fallBreak') {
     falls++;
-    queued = null;
+    queued = [];
     S = initState(S.li);
     computeView(); updateHud(); updateSwap(); draw();
     return;
@@ -860,7 +862,7 @@ function levelComplete() {
 
 function startLevel(li) {
   S = initState(li);
-  falls = 0; anim = null; queued = null; pending = null;
+  falls = 0; anim = null; queued = []; pending = null;
   computeView(); updateHud(); updateSwap(); draw();
 }
 
@@ -920,18 +922,9 @@ $('btnSwap').addEventListener('pointerdown', e => {
   if (S && S.mode === 'split' && !anim) { S.active = 1 - S.active; draw(); }
 });
 
-// swipe: pick the world direction whose screen angle is closest
-let touchStart = null;
-cv.addEventListener('touchstart', e => {
-  const t = e.changedTouches[0];
-  touchStart = [t.clientX, t.clientY];
-}, { passive: true });
-cv.addEventListener('touchend', e => {
-  if (!touchStart) return;
-  const t = e.changedTouches[0];
-  const dx = t.clientX - touchStart[0], dy = t.clientY - touchStart[1];
-  touchStart = null;
-  if (Math.hypot(dx, dy) < 24) return;
+// swipe: anywhere on screen, fires the moment the gesture is clear (no
+// waiting for the finger to lift), mapped to the nearest isometric axis
+function dirFromVector(dx, dy) {
   const dirsScreen = {
     right: [view.ux, view.uy], left: [-view.ux, -view.uy],
     down: [-view.ux, view.uy], up: [view.ux, -view.uy],
@@ -943,8 +936,23 @@ cv.addEventListener('touchend', e => {
     const dot = (dx * v[0] + dy * v[1]) / (len * vl);
     if (dot > bestDot) { bestDot = dot; best = name; }
   }
-  step(best);
+  return best;
+}
+let swipe = null;
+document.addEventListener('touchstart', e => {
+  if (e.target.closest('button, .overlay, input, #hud')) { swipe = null; return; }
+  const t = e.touches[0];
+  swipe = { x: t.clientX, y: t.clientY, fired: false };
 }, { passive: true });
+document.addEventListener('touchmove', e => {
+  if (!swipe || swipe.fired) return;
+  const t = e.touches[0];
+  const dx = t.clientX - swipe.x, dy = t.clientY - swipe.y;
+  if (Math.hypot(dx, dy) < 26) return;
+  swipe.fired = true;
+  step(dirFromVector(dx, dy));
+}, { passive: true });
+document.addEventListener('touchend', () => { swipe = null; }, { passive: true });
 
 /* ---------- buttons / screens ---------- */
 $('btnSound').addEventListener('click', () => {
@@ -981,7 +989,7 @@ $('btnCode').addEventListener('click', () => {
 
 /* ---------- resize / boot ---------- */
 function resize() {
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
   const r = cv.getBoundingClientRect();
   cv.width = Math.round(r.width * dpr);
   cv.height = Math.round(r.height * dpr);

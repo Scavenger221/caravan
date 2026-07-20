@@ -12,15 +12,15 @@
 <meta name="theme-color" content="#07090c">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
 <header id="hud">
-  <div class="hud-left" id="hudStage">STAGE 01</div>
-  <div class="hud-mid">
-    <div class="stat"><span id="hudMoves">0</span><label>moves</label></div>
-    <div class="stat"><span id="hudFalls">0</span><label>falls</label></div>
+  <div id="hudStage" class="stage">STAGE 01</div>
+  <div class="hud-stats">
+    <div class="chip"><label>MOVES</label><span id="hudMoves">0</span></div>
+    <div class="chip"><label>FALLS</label><span id="hudFalls">0</span></div>
   </div>
   <div class="hud-right">
     <button id="btnSound" class="icon-btn" aria-label="Sound on/off">&#9834;</button>
@@ -33,12 +33,13 @@
 
 <div id="controls">
   <div id="dpad">
-    <button data-dir="up"    class="pad up"    aria-label="Up">&#9650;</button>
-    <button data-dir="left"  class="pad left"  aria-label="Left">&#9664;</button>
+    <button data-dir="left"  class="pad nw" aria-label="Roll up-left">&#8598;</button>
+    <button data-dir="up"    class="pad ne" aria-label="Roll up-right">&#8599;</button>
     <button id="btnSwap"     class="pad mid hidden" aria-label="Swap halves">&#8646;</button>
-    <button data-dir="right" class="pad right" aria-label="Right">&#9654;</button>
-    <button data-dir="down"  class="pad down"  aria-label="Down">&#9660;</button>
+    <button data-dir="down"  class="pad sw" aria-label="Roll down-left">&#8601;</button>
+    <button data-dir="right" class="pad se" aria-label="Roll down-right">&#8600;</button>
   </div>
+  <div id="hint">swipe or tap &mdash; arrows match the board</div>
 </div>
 
 <div id="toast"></div>
@@ -82,6 +83,6 @@
   </div>
 </div>
 
-<script src="game.js?v=2"></script>
+<script src="game.js?v=3"></script>
 </body>
 </html>
