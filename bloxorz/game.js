@@ -515,8 +515,8 @@ const THEMES = {
     tel: '#e8edf3', closedBr: '#5a7d93',
   },
   classic: { // red felt, silver stone tiles, rusted iron block
-    tileA: '#dcddd5', tileB: '#cfd0c8', frA: '#e0913a', frB: '#d48630',
-    brA: '#a9aaa2', brB: '#9d9e96', block: '#6b3120', cube: '#8a6a58',
+    tileA: '#dcddd5', tileB: '#cfd0c8', frA: '#e8761c', frB: '#db6d15',
+    brA: '#a9aaa2', brB: '#9d9e96', block: '#6e4433', cube: '#7c6353',
     blockOutline: '#26100a', cubeOutline: '#26100a',
     tileEdge: '#6f7069', sideEdge: '#3c3d38',
     hole: '#0c0805', holeRim: '#55564f',
@@ -546,11 +546,14 @@ function setTheme(name) {
   // classic gets procedural grain: rust mottling on the block, stone
   // speckle on the tiles (generated once, cached on the theme object)
   if (name === 'classic' && !theme.blockNoise) {
-    theme.blockNoise = makeNoisePattern([
-      ['#2e130a', 220, 0.6, 2.4, 0.35],
-      ['#93472a', 160, 0.5, 2.0, 0.30],
-      ['#c26a35', 70, 0.4, 1.4, 0.25],
-      ['#1c0b05', 60, 1.0, 3.0, 0.25],
+    // patchy rust: broad orange oxide blotches and blue-grey metal spots
+    // over dark brown, plus a fine grain pass on top
+    theme.blockNoise = makeBlotchPattern(null, [
+      ['#c06430', 26, 7, 0.40],
+      ['#d47a38', 16, 5, 0.34],
+      ['#5b5c66', 14, 5, 0.22],
+      ['#2a1209', 14, 5, 0.24],
+      ['#e89048', 10, 3, 0.28],
     ]);
     theme.tileNoise = makeNoisePattern([
       ['#8e8f87', 150, 0.4, 1.2, 0.20],
@@ -665,6 +668,33 @@ function makeNoisePattern(dots) {
       g.fill();
     }
   }
+  return ctx.createPattern(c, 'repeat');
+}
+
+// Irregular blotch texture: clusters of overlapping circles, for patchy
+// rust rather than uniform speckle.
+function makeBlotchPattern(base, blobs) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  let seed = 424242;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  if (base) { g.fillStyle = base; g.fillRect(0, 0, 128, 128); }
+  for (const [color, count, blobR, alpha] of blobs) {
+    g.fillStyle = color;
+    for (let i = 0; i < count; i++) {
+      const bx = rnd() * 128, by = rnd() * 128;
+      const parts = 5 + Math.floor(rnd() * 7);
+      g.globalAlpha = alpha * (0.6 + rnd() * 0.4);
+      for (let j = 0; j < parts; j++) {
+        g.beginPath();
+        g.arc(bx + (rnd() - 0.5) * blobR * 2.2, by + (rnd() - 0.5) * blobR * 2.2,
+              blobR * (0.3 + rnd() * 0.7), 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+  }
+  g.globalAlpha = 1;
   return ctx.createPattern(c, 'repeat');
 }
 
