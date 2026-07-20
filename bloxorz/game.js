@@ -496,6 +496,7 @@ let S = null;          // engine state
 let falls = 0;         // falls on the current stage
 let anim = null;       // active animation
 let queued = [];       // buffered inputs (so quick swipes chain smoothly)
+let heldDir = null;    // held pad/key: keeps rolling while held
 let view = null;       // projection params
 
 /* ---------- sound (WebAudio, generated) ---------- */
@@ -816,6 +817,7 @@ function applyPending() {
     return;
   }
   if (queued.length) step(queued.shift());
+  else if (heldDir) step(heldDir);
 }
 
 function lastPose(r) {
@@ -838,6 +840,7 @@ function tick(now) {
   if (was === 'fall' || was === 'fallBreak') {
     falls++;
     queued = [];
+    heldDir = null; // don't march straight back off the edge
     S = initState(S.li);
     computeView(); updateHud(); updateSwap(); draw();
     return;
@@ -868,7 +871,8 @@ function startLevel(li) {
 
 /* ---------- HUD / overlays ---------- */
 function updateHud() {
-  $('hudStage').textContent = 'STAGE ' + String(S.li + 1).padStart(2, '0');
+  $('hudStage').textContent =
+    'STAGE ' + String(S.li + 1).padStart(2, '0') + '/' + LEVELS.length;
   $('hudMoves').textContent = S.moves;
   $('hudFalls').textContent = falls;
 }
@@ -904,19 +908,33 @@ function buildLevelGrid() {
 }
 
 /* ---------- input ---------- */
+const KEYMAP = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+                 w: 'up', s: 'down', a: 'left', d: 'right' };
 document.addEventListener('keydown', e => {
   const k = e.key;
-  const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-                w: 'up', s: 'down', a: 'left', d: 'right' };
-  if (map[k]) { e.preventDefault(); step(map[k]); }
-  else if (k === ' ' || k === 'Enter') {
+  if (KEYMAP[k]) {
+    e.preventDefault();
+    if (e.repeat) return;      // we do our own hold-repeat, synced to the roll
+    heldDir = KEYMAP[k];
+    step(heldDir);
+  } else if (k === ' ' || k === 'Enter') {
     if (S && S.mode === 'split' && !anim) { S.active = 1 - S.active; draw(); }
   } else if (k === 'r') { startLevel(S.li); }
 });
+document.addEventListener('keyup', e => {
+  if (KEYMAP[e.key] === heldDir) heldDir = null;
+});
 
 document.querySelectorAll('#dpad .pad[data-dir]').forEach(b => {
-  b.addEventListener('pointerdown', e => { e.preventDefault(); step(b.dataset.dir); });
+  b.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    heldDir = b.dataset.dir;
+    step(heldDir);
+  });
 });
+for (const ev of ['pointerup', 'pointercancel']) {
+  document.addEventListener(ev, () => { heldDir = null; });
+}
 $('btnSwap').addEventListener('pointerdown', e => {
   e.preventDefault();
   if (S && S.mode === 'split' && !anim) { S.active = 1 - S.active; draw(); }

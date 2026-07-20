@@ -87,35 +87,41 @@ body {
 /* the four pads sit at the corners of an X, matching the board's axes */
 #dpad {
   display: grid;
-  grid-template-columns: repeat(3, 62px);
-  grid-template-rows: repeat(3, 52px);
-  gap: 7px;
+  grid-template-columns: 64px 22px 64px;
+  grid-template-rows: 54px 16px 54px;
+  gap: 5px;
 }
 .pad {
   border: 1px solid #2a3340;
-  border-radius: 14px;
+  border-radius: 16px;
   background: #141a23;
   color: #cfd6de;
-  font-size: 21px;
+  font-size: 22px;
   cursor: pointer;
   transition: transform 0.08s;
+  touch-action: none;
 }
-.pad:active { background: #26313f; transform: scale(0.9); }
+.pad:active { background: #2a3646; transform: scale(0.92); }
 .pad.nw { grid-area: 1 / 1; }
 .pad.ne { grid-area: 1 / 3; }
 .pad.sw { grid-area: 3 / 1; }
 .pad.se { grid-area: 3 / 3; }
 .pad.mid {
   grid-area: 2 / 2;
+  place-self: center;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   color: #d6a032;
   border-color: #5c4715;
-  font-size: 20px;
+  background: #191510;
+  font-size: 19px;
+  z-index: 1;
 }
 #hint {
-  font-size: 10px;
+  font-size: 9px;
   letter-spacing: 0.14em;
-  color: #4a5461;
+  color: #414b57;
   text-transform: uppercase;
 }
 .hidden { visibility: hidden; }
