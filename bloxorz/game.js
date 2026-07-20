@@ -896,9 +896,54 @@ function renderTile(x, y, ch) {
   drawGlyphs(eff, x, y);
 }
 
+// Per-theme atmospheric backdrop, drawn procedurally to an offscreen
+// canvas (seeded, cached per theme+size). Sits over the CSS gradient.
+let BG = null, bgKey = '';
+function ensureBG() {
+  const name = save.theme || 'slate';
+  const key = name + ':' + cv.width + 'x' + cv.height;
+  if (BG && bgKey === key) return;
+  bgKey = key;
+  BG = document.createElement('canvas');
+  BG.width = cv.width; BG.height = cv.height;
+  const g = BG.getContext('2d');
+  const W = BG.width, H = BG.height, M = Math.max(W, H);
+  let seed = 20260720;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const soft = (x, y, r, rgb, a) => {
+    const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, 'rgba(' + rgb + ',' + a + ')');
+    gr.addColorStop(1, 'rgba(' + rgb + ',0)');
+    g.fillStyle = gr;
+    g.fillRect(x - r, y - r, r * 2, r * 2);
+  };
+  if (name === 'classic') {
+    // hot glow high in the sky, black smoke banked along the bottom
+    soft(W * 0.55, H * 0.22, M * 0.75, '224,66,18', 0.4);
+    for (let i = 0; i < 7; i++) {
+      soft(rnd() * W * 0.6, H * (0.35 + rnd() * 0.35), M * (0.10 + rnd() * 0.14), '26,4,0', 0.18 + rnd() * 0.18);
+    }
+    for (let i = 0; i < 18; i++) {
+      soft(rnd() * W, H * (0.62 + rnd() * 0.45), M * (0.08 + rnd() * 0.16), '6,1,0', 0.26 + rnd() * 0.3);
+    }
+  } else if (name === 'mono') {
+    soft(W * 0.5, H * 0.3, M * 0.6, '255,255,255', 0.05);
+    for (let i = 0; i < 10; i++) {
+      soft(rnd() * W, H * (0.7 + rnd() * 0.4), M * (0.08 + rnd() * 0.14), '0,0,0', 0.25 + rnd() * 0.25);
+    }
+  } else { // slate: cool quiet glow, faint dark floor haze
+    soft(W * 0.5, H * 0.28, M * 0.65, '68,108,158', 0.12);
+    for (let i = 0; i < 8; i++) {
+      soft(rnd() * W, H * (0.75 + rnd() * 0.35), M * (0.09 + rnd() * 0.13), '2,4,8', 0.22 + rnd() * 0.2);
+    }
+  }
+}
+
 function draw() {
   const L = LEVELS[S.li];
   ctx.clearRect(0, 0, cv.width, cv.height);
+  ensureBG();
+  ctx.drawImage(BG, 0, 0);
 
   const tiles = [];
   for (let y = 0; y < L.map.length; y++) {
