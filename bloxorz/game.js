@@ -543,6 +543,21 @@ function setTheme(name) {
   document.body.dataset.theme = name;
   document.querySelectorAll('.themebtn').forEach(b =>
     b.classList.toggle('active', b.dataset.theme === name));
+  // classic gets procedural grain: rust mottling on the block, stone
+  // speckle on the tiles (generated once, cached on the theme object)
+  if (name === 'classic' && !theme.blockNoise) {
+    theme.blockNoise = makeNoisePattern([
+      ['#2e130a', 220, 0.6, 2.4, 0.35],
+      ['#93472a', 160, 0.5, 2.0, 0.30],
+      ['#c26a35', 70, 0.4, 1.4, 0.25],
+      ['#1c0b05', 60, 1.0, 3.0, 0.25],
+    ]);
+    theme.tileNoise = makeNoisePattern([
+      ['#8e8f87', 150, 0.4, 1.2, 0.20],
+      ['#ffffff', 80, 0.3, 1.0, 0.18],
+      ['#6f7069', 40, 0.5, 1.6, 0.12],
+    ]);
+  }
   if (S) draw();
 }
 
@@ -632,6 +647,37 @@ function poly(pts, fill, stroke, lw) {
   if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 1; ctx.stroke(); }
 }
 
+// Procedural speckle textures (generated in code — no image assets).
+// Seeded PRNG keeps the pattern identical every frame.
+function makeNoisePattern(dots) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 96;
+  const g = c.getContext('2d');
+  let seed = 1234567;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  for (const [color, count, rMin, rMax, alpha] of dots) {
+    g.fillStyle = color;
+    g.globalAlpha = alpha;
+    for (let i = 0; i < count; i++) {
+      const r = rMin + rnd() * (rMax - rMin);
+      g.beginPath();
+      g.arc(rnd() * 96, rnd() * 96, r, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  return ctx.createPattern(c, 'repeat');
+}
+
+function texFill(pattern, alpha) {
+  // fills the current path (set by poly) with the texture pattern
+  ctx.save();
+  ctx.clip();
+  ctx.globalAlpha *= alpha;
+  ctx.fillStyle = pattern;
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawSlab(x, y, top, dropZ, alpha) {
   const z0 = -(dropZ || 0);
   if (alpha !== undefined) ctx.globalAlpha = alpha;
@@ -642,6 +688,13 @@ function drawSlab(x, y, top, dropZ, alpha) {
   poly([D, C, Ct, Dt], shade(top, 0.55), theme.sideEdge, 1);   // front-left face
   poly([B, C, Ct, Bt], shade(top, 0.42), theme.sideEdge, 1);   // front-right face
   poly([A, B, C, D], top, theme.tileEdge, 1.5);                // top
+  if (theme.tileNoise) {
+    ctx.beginPath();
+    ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]);
+    ctx.lineTo(C[0], C[1]); ctx.lineTo(D[0], D[1]);
+    ctx.closePath();
+    texFill(theme.tileNoise, 1);
+  }
   ctx.globalAlpha = 1;
 }
 
@@ -729,8 +782,15 @@ function drawBox(cs, base, outline, alpha) {
     n = norm3(n);
     if (n[0] * VIEW_V[0] + n[1] * VIEW_V[1] + n[2] * VIEW_V[2] <= 0.001) continue;
     const lum = Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]);
-    poly(f.map(i => proj(cs[i][0], cs[i][1], cs[i][2])),
-      shade(base, 0.45 + 0.6 * lum), outline, 2);
+    const pts = f.map(i => proj(cs[i][0], cs[i][1], cs[i][2]));
+    poly(pts, shade(base, 0.45 + 0.6 * lum), outline, 2);
+    if (theme.blockNoise && base === theme.block) {
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.closePath();
+      texFill(theme.blockNoise, 0.5 + 0.4 * lum);
+    }
   }
   ctx.globalAlpha = 1;
 }
