@@ -514,14 +514,14 @@ const THEMES = {
     swFill: '#3d4653', swRim: '#12161d', hardX: '#2a313c',
     tel: '#e8edf3', closedBr: '#5a7d93',
   },
-  classic: { // warm palette in the spirit of the old flash puzzlers
-    tileA: '#cfc9ba', tileB: '#c1bbac', frA: '#e0821a', frB: '#d17714',
-    brA: '#8fa3ad', brB: '#83979f', block: '#b9873a', cube: '#7d6b45',
-    blockOutline: '#241503', cubeOutline: '#171006',
-    tileEdge: '#171208', sideEdge: '#0c0904',
-    hole: '#070502', holeRim: '#4c4234',
-    swFill: '#4c463a', swRim: '#171208', hardX: '#3c362b',
-    tel: '#f4efe4', closedBr: '#8fa3ad',
+  classic: { // red felt, silver stone tiles, rusted iron block
+    tileA: '#dcddd5', tileB: '#cfd0c8', frA: '#e0913a', frB: '#d48630',
+    brA: '#a9aaa2', brB: '#9d9e96', block: '#6b3120', cube: '#8a6a58',
+    blockOutline: '#26100a', cubeOutline: '#26100a',
+    tileEdge: '#6f7069', sideEdge: '#3c3d38',
+    hole: '#0c0805', holeRim: '#55564f',
+    swFill: '#a3a49a', swRim: '#5b5c54', hardX: '#83847b',
+    tel: '#3a3b35', closedBr: '#b9bab2',
   },
   mono: {    // black & white
     tileA: '#d8d8d8', tileB: '#c9c9c9', frA: '#7f7f7f', frB: '#747474',
@@ -1128,14 +1128,21 @@ document.addEventListener('touchend', () => {
 }, { passive: true });
 
 /* ---------- buttons / screens ---------- */
+function updateSoundBtn() {
+  $('btnSound').textContent = 'SOUND: ' + (soundOn ? 'ON' : 'OFF');
+  $('btnSound').classList.toggle('muted', !soundOn);
+}
 $('btnSound').addEventListener('click', () => {
   soundOn = !soundOn;
   save.sound = soundOn;
   persist();
-  $('btnSound').classList.toggle('muted', !soundOn);
+  updateSoundBtn();
   if (soundOn) snd.switch();
 });
-$('btnSound').classList.toggle('muted', !soundOn);
+updateSoundBtn();
+
+$('btnSettings').addEventListener('click', () => show('settings'));
+$('btnCloseSettings').addEventListener('click', () => hide('settings'));
 
 $('btnReset').addEventListener('click', () => { if (S) startLevel(S.li); });
 $('btnUndo').addEventListener('click', undo);

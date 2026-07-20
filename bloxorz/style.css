@@ -19,12 +19,12 @@ html, body {
   --accent-text: #14100a;
 }
 body[data-theme='classic'] {
-  --bg1: #1c1409;
-  --bg2: #0b0703;
-  --accent: #cf8f2e;
-  --accent-dark: #b47a24;
-  --accent-dim: #5e451a;
-  --accent-text: #170f04;
+  --bg1: #a8290c;
+  --bg2: #4e1004;
+  --accent: #f2b23a;
+  --accent-dark: #d29527;
+  --accent-dim: #8a5c18;
+  --accent-text: #2a1503;
 }
 body[data-theme='mono'] {
   --bg1: #181818;
@@ -293,6 +293,17 @@ body {
   letter-spacing: 0.1em;
   cursor: pointer;
 }
+
+/* settings */
+.setlabel {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: #67727f;
+  text-align: left;
+  margin: 4px 0 8px;
+}
+.setrow { margin-bottom: 18px; }
+.big.ghost.muted { color: #4a5461; }
 
 /* theme picker */
 .themerow { display: flex; gap: 8px; margin-bottom: 14px; }
