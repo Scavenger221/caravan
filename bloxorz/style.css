@@ -84,6 +84,19 @@ body {
   gap: 8px;
   padding: 4px 0 12px;
 }
+#ctlRow { display: flex; align-items: center; gap: 20px; }
+.side-btn {
+  width: 48px; height: 48px;
+  border: 1px solid #2a3340;
+  border-radius: 50%;
+  background: #141a23;
+  color: #aeb8c4;
+  font-size: 19px;
+  cursor: pointer;
+  transition: transform 0.08s, opacity 0.15s;
+}
+.side-btn:active { background: #2a3646; transform: scale(0.92); }
+.side-btn.disabled { opacity: 0.3; }
 /* the four pads sit at the corners of an X, matching the board's axes */
 #dpad {
   display: grid;
@@ -221,7 +234,13 @@ body {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
 }
+.lvl small { font-size: 8px; font-weight: 400; color: #67727f; }
 .lvl.cleared { border-color: #5c4715; color: #d6a032; }
 .lvl.locked { color: #39424e; cursor: default; }
 .lvl:not(.locked):active { background: #24303f; }

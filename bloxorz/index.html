@@ -12,7 +12,7 @@
 <meta name="theme-color" content="#07090c">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 
@@ -24,7 +24,6 @@
   </div>
   <div class="hud-right">
     <button id="btnSound" class="icon-btn" aria-label="Sound on/off">&#9834;</button>
-    <button id="btnReset" class="icon-btn" aria-label="Restart stage">&#8634;</button>
     <button id="btnLevels" class="icon-btn" aria-label="Stage select">&#9776;</button>
   </div>
 </header>
@@ -32,12 +31,16 @@
 <canvas id="board"></canvas>
 
 <div id="controls">
-  <div id="dpad">
-    <button data-dir="left"  class="pad nw" aria-label="Roll up-left">&#8598;</button>
-    <button data-dir="up"    class="pad ne" aria-label="Roll up-right">&#8599;</button>
-    <button id="btnSwap"     class="pad mid hidden" aria-label="Swap halves">&#8646;</button>
-    <button data-dir="down"  class="pad sw" aria-label="Roll down-left">&#8601;</button>
-    <button data-dir="right" class="pad se" aria-label="Roll down-right">&#8600;</button>
+  <div id="ctlRow">
+    <button id="btnUndo" class="side-btn disabled" aria-label="Undo move">&#8617;</button>
+    <div id="dpad">
+      <button data-dir="left"  class="pad nw" aria-label="Roll up-left">&#8598;</button>
+      <button data-dir="up"    class="pad ne" aria-label="Roll up-right">&#8599;</button>
+      <button id="btnSwap"     class="pad mid hidden" aria-label="Swap halves">&#8646;</button>
+      <button data-dir="down"  class="pad sw" aria-label="Roll down-left">&#8601;</button>
+      <button data-dir="right" class="pad se" aria-label="Roll down-right">&#8600;</button>
+    </div>
+    <button id="btnReset" class="side-btn" aria-label="Restart stage">&#8634;</button>
   </div>
   <div id="hint">swipe or tap &mdash; arrows match the board</div>
 </div>
@@ -54,6 +57,7 @@
       <li>Round switches trigger on any touch. X&nbsp;switches need the block standing on them. They open and close bridges.</li>
       <li>Teleporters split the block into two halves &mdash; use &#8646; to swap between them. Rejoin them side by side.</li>
       <li>The block must be standing upright to drop into the hole.</li>
+      <li>Misstep? &#8617; takes back your last move &mdash; even a fatal one.</li>
     </ul>
     <button id="btnPlay" class="big">PLAY</button>
   </div>
@@ -77,12 +81,13 @@
     <div class="doneStats">
       <div class="stat"><span id="doneMoves">0</span><label>moves</label></div>
       <div class="stat"><span id="doneBest">0</span><label>best</label></div>
+      <div class="stat"><span id="donePar">0</span><label>par</label></div>
     </div>
     <p id="doneCode" class="code"></p>
     <button id="btnNext" class="big">CONTINUE</button>
   </div>
 </div>
 
-<script src="game.js?v=5"></script>
+<script src="game.js?v=6"></script>
 </body>
 </html>

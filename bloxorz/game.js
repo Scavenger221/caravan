@@ -299,6 +299,9 @@ const LEVELS = [
   },
 ];
 
+// Optimal move count per level (verified by the BFS solver in dev).
+const PARS = [6, 11, 8, 10, 11, 18, 12, 19, 12, 11, 10, 14, 14, 11, 18, 13, 21, 14, 20, 31];
+
 /* ================================ ENGINE ================================ */
 
 const DIRS = {
@@ -471,7 +474,7 @@ function tryMove(st, dirName) {
 
 // Node export for the offline level solver; browsers continue to boot().
 if (typeof document === 'undefined') {
-  module.exports = { LEVELS, DIRS, initState, tryMove, cloneState };
+  module.exports = { LEVELS, DIRS, PARS, initState, tryMove, cloneState };
 } else {
   boot();
 }
@@ -497,6 +500,7 @@ let falls = 0;         // falls on the current stage
 let anim = null;       // active animation
 let queued = [];       // buffered inputs (so quick swipes chain smoothly)
 let heldDir = null;    // held pad/key: keeps rolling while held
+let history = [];      // undo stack (survives a fall, so you can undo the fatal move)
 let view = null;       // projection params
 
 /* ---------- sound (WebAudio, generated) ---------- */
@@ -836,6 +840,8 @@ function step(dirName) {
 function applyPending() {
   const r = pending; pending = null;
   const evs = r.events;
+  history.push(cloneState(S));
+  if (history.length > 300) history.shift();
   S = r.state;
   updateHud();
 
@@ -937,6 +943,7 @@ function levelComplete() {
   persist();
   $('doneMoves').textContent = S.moves;
   $('doneBest').textContent = save.best[li];
+  $('donePar').textContent = PARS[li];
   const last = li === LEVELS.length - 1;
   $('doneCode').textContent = last ? '' : 'PASSCODE  ' + LEVELS[li + 1].code;
   $('doneTitle').textContent = last ? 'ALL STAGES CLEAR' : 'STAGE COMPLETE';
@@ -947,8 +954,17 @@ function levelComplete() {
 function startLevel(li) {
   S = initState(li);
   falls = 0; anim = null; queued = []; pending = null; heldDir = null;
+  history = [];
   computeView(); updateHud(); updateSwap();
   startBuild();
+}
+
+function undo() {
+  if (!S || anim || S.status !== 'play' || !history.length) return;
+  S = history.pop();
+  S.status = 'play';
+  queued = []; heldDir = null;
+  updateHud(); updateSwap(); draw();
 }
 
 /* ---------- HUD / overlays ---------- */
@@ -957,6 +973,7 @@ function updateHud() {
     'STAGE ' + String(S.li + 1).padStart(2, '0') + '/' + LEVELS.length;
   $('hudMoves').textContent = S.moves;
   $('hudFalls').textContent = falls;
+  $('btnUndo').classList.toggle('disabled', !history.length);
 }
 function updateSwap() {
   $('btnSwap').classList.toggle('hidden', !S || S.mode !== 'split');
@@ -982,7 +999,12 @@ function buildLevelGrid() {
     const locked = i > save.unlocked;
     b.textContent = locked ? '·' : String(i + 1);
     if (locked) b.classList.add('locked');
-    else if (save.best[i] !== undefined) b.classList.add('cleared');
+    else if (save.best[i] !== undefined) {
+      b.classList.add('cleared');
+      const s = document.createElement('small');
+      s.textContent = save.best[i];
+      b.appendChild(s);
+    }
     b.disabled = locked;
     b.addEventListener('click', () => { hide('levels'); startLevel(i); });
     grid.appendChild(b);
@@ -1002,6 +1024,7 @@ document.addEventListener('keydown', e => {
   } else if (k === ' ' || k === 'Enter') {
     if (S && S.mode === 'split' && !anim) { S.active = 1 - S.active; draw(); }
   } else if (k === 'r') { startLevel(S.li); }
+  else if (k === 'z' || k === 'u') { undo(); }
 });
 document.addEventListener('keyup', e => {
   if (KEYMAP[e.key] === heldDir) heldDir = null;
@@ -1052,7 +1075,14 @@ document.addEventListener('touchmove', e => {
   swipe.fired = true;
   step(dirFromVector(dx, dy));
 }, { passive: true });
-document.addEventListener('touchend', () => { swipe = null; }, { passive: true });
+document.addEventListener('touchend', () => {
+  // a tap (no swipe) on the board swaps halves while split
+  if (swipe && !swipe.fired && S && S.mode === 'split' && !anim && S.status === 'play') {
+    S.active = 1 - S.active;
+    draw();
+  }
+  swipe = null;
+}, { passive: true });
 
 /* ---------- buttons / screens ---------- */
 $('btnSound').addEventListener('click', () => {
@@ -1065,10 +1095,23 @@ $('btnSound').addEventListener('click', () => {
 $('btnSound').classList.toggle('muted', !soundOn);
 
 $('btnReset').addEventListener('click', () => { if (S) startLevel(S.li); });
+$('btnUndo').addEventListener('click', undo);
+
+// keep the screen awake during play (supported on iOS 16.4+; harmless elsewhere)
+let wakeLock = null;
+async function keepAwake() {
+  try {
+    if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') keepAwake();
+});
 $('btnLevels').addEventListener('click', () => { buildLevelGrid(); show('levels'); });
 $('btnCloseLevels').addEventListener('click', () => hide('levels'));
 $('btnPlay').addEventListener('click', () => {
   ac();
+  keepAwake();
   hide('intro');
   startLevel(Math.min(save.unlocked, LEVELS.length - 1));
 });
