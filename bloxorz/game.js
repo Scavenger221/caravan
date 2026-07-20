@@ -1240,6 +1240,8 @@ function startLevel(li) {
   S = initState(li);
   falls = 0; anim = null; queued = []; pending = null; heldDir = null;
   history = [];
+  save.last = li;   // resume here on the next launch
+  persist();
   computeView(); updateHud(); updateSwap();
   startBuild();
 }
@@ -1420,8 +1422,20 @@ $('btnPlay').addEventListener('click', () => {
   ac();
   keepAwake();
   hide('intro');
-  startLevel(Math.min(save.unlocked, LEVELS.length - 1));
+  // the intro is one-time; reopened from settings it just closes,
+  // leaving the running game untouched
+  if (!save.seenIntro) {
+    save.seenIntro = true;
+    persist();
+    startLevel(resumeLevel());
+  }
 });
+$('btnHow').addEventListener('click', () => { hide('settings'); show('intro'); });
+
+function resumeLevel() {
+  const li = save.last !== undefined ? save.last : save.unlocked;
+  return Math.min(li, LEVELS.length - 1);
+}
 $('btnNext').addEventListener('click', () => {
   hide('done');
   if (S.li === LEVELS.length - 1) { buildLevelGrid(); show('levels'); }
@@ -1458,8 +1472,14 @@ if ('serviceWorker' in navigator) {
 
 setTheme(save.theme && THEMES[save.theme] ? save.theme : 'slate');
 setControls(save.controls || 'pads');
-show('intro');
-S = initState(Math.min(save.unlocked, LEVELS.length - 1));
-computeView(); updateHud(); updateSwap(); draw();
+if (save.seenIntro) {
+  // returning player: straight into the last-played stage, no prompt
+  keepAwake();
+  startLevel(resumeLevel());
+} else {
+  show('intro');
+  S = initState(resumeLevel());
+  computeView(); updateHud(); updateSwap(); draw();
+}
 
 } // boot
