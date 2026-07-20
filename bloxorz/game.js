@@ -688,11 +688,49 @@ function drawBox(cs, base, outline, alpha) {
   ctx.globalAlpha = 1;
 }
 
+// Per-tile offset/alpha while the level is assembling or crumbling,
+// staggered along the board diagonal so it ripples across the floor.
+function tileFxAt(x, y) {
+  if (!anim || (anim.type !== 'build' && anim.type !== 'crumble')) return null;
+  const T = anim.t * anim.dur;
+  const p = Math.max(0, Math.min(1, (T - (x + y) * anim.stag) / anim.tileMs));
+  if (anim.type === 'build') {
+    return { dz: -(1 - p) * (1 - p) * 7, alpha: p * p, p }; // drop in from above
+  }
+  return { dz: p * p * 10, alpha: 1 - p, p };               // fall away below
+}
+
+function renderTile(x, y, ch) {
+  if (ch >= '1' && ch <= '4' && !S.bridges[ch]) {
+    const fx = tileFxAt(x, y);
+    if (fx && fx.p < 1) return;
+    // closed bridge: faint outline only
+    ctx.globalAlpha = 0.18;
+    poly([proj(x, y, 0), proj(x + 1, y, 0), proj(x + 1, y + 1, 0), proj(x, y + 1, 0)],
+      null, '#5a7d93', 1.5);
+    ctx.globalAlpha = 1;
+    return;
+  }
+  if (anim && anim.type === 'fallBreak' && anim.bx === x && anim.by === y) {
+    drawSlab(x, y, tileTopColor(ch, x, y), anim.zoff, Math.max(0, 1 - anim.t));
+    return;
+  }
+  const eff = ch === 'S' ? '#' : ch;
+  const fx = tileFxAt(x, y);
+  if (fx) {
+    if (fx.p <= 0) return;
+    drawSlab(x, y, tileTopColor(eff, x, y), fx.dz, fx.alpha);
+    if (fx.p >= 1) drawGlyphs(eff, x, y);
+    return;
+  }
+  drawSlab(x, y, tileTopColor(eff, x, y));
+  drawGlyphs(eff, x, y);
+}
+
 function draw() {
   const L = LEVELS[S.li];
   ctx.clearRect(0, 0, cv.width, cv.height);
 
-  // tiles, back to front
   const tiles = [];
   for (let y = 0; y < L.map.length; y++) {
     for (let x = 0; x < L.map[y].length; x++) {
@@ -702,26 +740,34 @@ function draw() {
     }
   }
   tiles.sort((a, b) => (a[0] + a[1]) - (b[0] + b[1]));
-  for (const [x, y, ch] of tiles) {
-    if (ch >= '1' && ch <= '4' && !S.bridges[ch]) {
-      // closed bridge: faint outline only
-      ctx.globalAlpha = 0.18;
-      poly([proj(x, y, 0), proj(x + 1, y, 0), proj(x + 1, y + 1, 0), proj(x, y + 1, 0)],
-        null, '#5a7d93', 1.5);
-      ctx.globalAlpha = 1;
-      continue;
-    }
-    if (anim && anim.type === 'fallBreak' && anim.bx === x && anim.by === y) {
-      drawSlab(x, y, tileTopColor(ch, x, y), anim.zoff, Math.max(0, 1 - anim.t));
-      continue;
-    }
-    const eff = ch === 'S' ? '#' : ch;
-    drawSlab(x, y, tileTopColor(eff, x, y));
-    drawGlyphs(eff, x, y);
-  }
 
-  // block / cubes
+  // While falling, tiles level with or in front of the block's column are
+  // drawn AFTER it, so the block drops behind the floor instead of over it.
+  const isFall = anim && (anim.type === 'fall' || anim.type === 'fallBreak');
+  const frontSum = isFall ? anim.frontSum : Infinity;
+  for (const [x, y, ch] of tiles) if (x + y < frontSum) renderTile(x, y, ch);
+  drawEntities();
+  if (isFall) for (const [x, y, ch] of tiles) if (x + y >= frontSum) renderTile(x, y, ch);
+}
+
+function drawEntities() {
   const BLOCK = '#d6a032', CUBE_IDLE = '#8d7a4e';
+  if (anim && anim.type === 'crumble') return; // the block already fell
+  if (anim && anim.type === 'build') {
+    // the block (or cubes) drops in along with its own row of tiles
+    const boxes = S.mode === 'block'
+      ? [[S.box, BLOCK]]
+      : S.cubes.map((c, i) => [{ x: c.x, y: c.y, dx: 1, dy: 1, dz: 1 },
+                               i === S.active ? BLOCK : CUBE_IDLE]);
+    boxes.sort((a, b) => (a[0].x + a[0].y) - (b[0].x + b[0].y));
+    for (const [b, col] of boxes) {
+      const fx = tileFxAt(b.x, b.y);
+      if (fx && fx.p <= 0) continue;
+      const dz = fx ? fx.dz : 0, al = fx ? fx.alpha : 1;
+      drawBox(boxCorners(b).map(p => [p[0], p[1], p[2] - dz]), col, '#221405', al);
+    }
+    return;
+  }
   if (anim && (anim.type === 'roll')) {
     // ease-in: the block tips slowly then falls onto its face, like gravity
     const th = Math.pow(anim.t, 1.55) * Math.PI / 2;
@@ -806,6 +852,7 @@ function applyPending() {
       type: brk ? 'fallBreak' : 'fall', t: 0, t0: performance.now(), dur: FALL_MS,
       pose: boxCorners(b), zoff: 0, who: evs[0].who,
       bx: brk && brk.x, by: brk && brk.y,
+      frontSum: Math.min(...footprint(b).map(([x, y]) => x + y)),
     };
     requestAnimationFrame(tick);
     return;
@@ -841,11 +888,45 @@ function tick(now) {
     falls++;
     queued = [];
     heldDir = null; // don't march straight back off the edge
+    startCrumble();
+    return;
+  }
+  if (was === 'crumble') {
     S = initState(S.li);
-    computeView(); updateHud(); updateSwap(); draw();
+    computeView(); updateHud(); updateSwap();
+    startBuild();
+    return;
+  }
+  if (was === 'build') {
+    draw();
+    if (queued.length) step(queued.shift());
+    else if (heldDir) step(heldDir);
     return;
   }
   if (was === 'sink') { levelComplete(); }
+}
+
+function levelMaxSum() {
+  const L = LEVELS[S.li];
+  let m = 0;
+  for (let y = 0; y < L.map.length; y++)
+    for (let x = 0; x < L.map[y].length; x++)
+      if (L.map[y][x] !== '.') m = Math.max(m, x + y);
+  return m;
+}
+
+function startBuild() {
+  const stag = 26, tileMs = 300;
+  anim = { type: 'build', t: 0, t0: performance.now(),
+           dur: levelMaxSum() * stag + tileMs, stag, tileMs };
+  requestAnimationFrame(tick);
+}
+
+function startCrumble() {
+  const stag = 18, tileMs = 260;
+  anim = { type: 'crumble', t: 0, t0: performance.now(),
+           dur: levelMaxSum() * stag + tileMs, stag, tileMs };
+  requestAnimationFrame(tick);
 }
 
 function levelComplete() {
@@ -865,8 +946,9 @@ function levelComplete() {
 
 function startLevel(li) {
   S = initState(li);
-  falls = 0; anim = null; queued = []; pending = null;
-  computeView(); updateHud(); updateSwap(); draw();
+  falls = 0; anim = null; queued = []; pending = null; heldDir = null;
+  computeView(); updateHud(); updateSwap();
+  startBuild();
 }
 
 /* ---------- HUD / overlays ---------- */
