@@ -211,6 +211,7 @@ body {
   letter-spacing: 0.26em;
   color: var(--accent);
   margin-bottom: 6px;
+  text-shadow: 0 0 6px var(--accent-dim), 0 0 18px var(--accent-dim);
 }
 .panel h2 { font-size: 19px; letter-spacing: 0.2em; color: #e8edf3; margin-bottom: 16px; }
 .tag { font-size: 13px; color: #8d98a5; margin-bottom: 16px; letter-spacing: 0.05em; }

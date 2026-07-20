@@ -695,6 +695,12 @@ function drawSlab(x, y, top, dropZ, alpha) {
     ctx.closePath();
     texFill(theme.tileNoise, 1);
   }
+  // subtle bevel: light catches the two back edges of the tile top
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(D[0], D[1]); ctx.lineTo(A[0], A[1]); ctx.lineTo(B[0], B[1]);
+  ctx.stroke();
   ctx.globalAlpha = 1;
 }
 
@@ -714,19 +720,36 @@ function drawGlyphs(ch, x, y) {
           proj(x + 1 - m, y + 1 - m, 0), proj(x + m, y + 1 - m, 0)],
       theme.hole, theme.holeRim, 1.5);
   } else if (ch >= 'a' && ch <= 'd') {
+    // soft switch: a domed pebble — drop shadow, shaded dome, rim
+    const rx = view.ux * 0.26, ry = view.uy * 0.26;
     ctx.beginPath();
-    ctx.ellipse(c[0], c[1], view.ux * 0.26, view.uy * 0.26, 0, 0, Math.PI * 2);
-    ctx.fillStyle = theme.swFill; ctx.fill();
-    ctx.strokeStyle = theme.swRim; ctx.lineWidth = 2; ctx.stroke();
+    ctx.ellipse(c[0] + 1.5, c[1] + 2, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fill();
+    const g = ctx.createRadialGradient(
+      c[0] - rx * 0.35, c[1] - ry * 0.55, rx * 0.1, c[0], c[1], rx * 1.15);
+    g.addColorStop(0, shade(theme.swFill, 1.4));
+    g.addColorStop(0.65, theme.swFill);
+    g.addColorStop(1, shade(theme.swFill, 0.62));
+    ctx.beginPath();
+    ctx.ellipse(c[0], c[1], rx, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = theme.swRim; ctx.lineWidth = 1.5; ctx.stroke();
   } else if (ch >= 'A' && ch <= 'D') {
+    // hard switch: beveled metal cross — dark base pass, light top pass
     const m = 0.24;
-    ctx.strokeStyle = theme.hardX; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
-    ctx.beginPath();
-    let p = proj(x + m, y + m, 0); ctx.moveTo(p[0], p[1]);
-    p = proj(x + 1 - m, y + 1 - m, 0); ctx.lineTo(p[0], p[1]);
-    p = proj(x + 1 - m, y + m, 0); ctx.moveTo(p[0], p[1]);
-    p = proj(x + m, y + 1 - m, 0); ctx.lineTo(p[0], p[1]);
-    ctx.stroke(); ctx.lineCap = 'butt';
+    const xPath = off => {
+      ctx.beginPath();
+      let p = proj(x + m, y + m, 0); ctx.moveTo(p[0] + off, p[1] + off);
+      p = proj(x + 1 - m, y + 1 - m, 0); ctx.lineTo(p[0] + off, p[1] + off);
+      p = proj(x + 1 - m, y + m, 0); ctx.moveTo(p[0] + off, p[1] + off);
+      p = proj(x + m, y + 1 - m, 0); ctx.lineTo(p[0] + off, p[1] + off);
+      ctx.stroke();
+    };
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = shade(theme.hardX, 0.45); ctx.lineWidth = 5; xPath(1);
+    ctx.strokeStyle = theme.hardX; ctx.lineWidth = 4; xPath(0);
+    ctx.strokeStyle = shade(theme.hardX, 1.45); ctx.lineWidth = 1.6; xPath(-0.8);
+    ctx.lineCap = 'butt';
   } else if (ch === 'T') {
     for (const [ox, oy] of [[0.32, 0.5], [0.68, 0.5]]) {
       const q = proj(x + ox, y + oy, 0);
