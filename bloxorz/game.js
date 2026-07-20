@@ -546,16 +546,7 @@ function setTheme(name) {
   // classic gets procedural grain: rust mottling on the block, stone
   // speckle on the tiles (generated once, cached on the theme object)
   if (name === 'classic' && !theme.blockNoise) {
-    // patchy rust: broad orange oxide blotches and blue-grey metal spots
-    // over dark brown, plus a fine grain pass on top
-    theme.blockNoise = makeBlotchPattern(null, [
-      ['#b85e2c', 10, 16, 0.55],  // broad rust clouds
-      ['#cf7233', 16, 8, 0.55],   // medium patches
-      ['#565d6e', 10, 9, 0.38],   // cool blue-grey metal
-      ['#22100a', 12, 8, 0.42],   // dark scorch
-      ['#ec9448', 18, 3.5, 0.55], // bright oxide flecks
-      ['#f7ae60', 12, 1.8, 0.55], // fine highlights
-    ]);
+    theme.blockNoise = makeRustTexture();
     theme.tileNoise = makeNoisePattern([
       ['#8e8f87', 150, 0.4, 1.2, 0.20],
       ['#ffffff', 80, 0.3, 1.0, 0.18],
@@ -669,6 +660,80 @@ function makeNoisePattern(dots) {
       g.fill();
     }
   }
+  return ctx.createPattern(c, 'repeat');
+}
+
+// Per-pixel fractal value noise mapped onto a rust color ramp: covers the
+// whole surface in natural mottling instead of blobs over a flat base.
+function makeRustTexture() {
+  const SZ = 128;
+  const c = document.createElement('canvas');
+  c.width = c.height = SZ;
+  const g = c.getContext('2d');
+  let seed = 987654321;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+
+  // tileable value-noise lattice + bilinear sample with smoothstep
+  const makeGrid = n => {
+    const a = [];
+    for (let i = 0; i < n * n; i++) a.push(rnd());
+    return { n, a };
+  };
+  const sample = (gr, u, v) => {
+    const n = gr.n;
+    const x = u * n, y = v * n;
+    const x0 = Math.floor(x) % n, y0 = Math.floor(y) % n;
+    const x1 = (x0 + 1) % n, y1 = (y0 + 1) % n;
+    let fx = x - Math.floor(x), fy = y - Math.floor(y);
+    fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+    const a00 = gr.a[y0 * n + x0], a10 = gr.a[y0 * n + x1];
+    const a01 = gr.a[y1 * n + x0], a11 = gr.a[y1 * n + x1];
+    return (a00 * (1 - fx) + a10 * fx) * (1 - fy) + (a01 * (1 - fx) + a11 * fx) * fy;
+  };
+  const oct = [makeGrid(4), makeGrid(8), makeGrid(16), makeGrid(32), makeGrid(64)];
+  const wgt = [0.38, 0.26, 0.18, 0.12, 0.06];
+  const metal = [makeGrid(5), makeGrid(11)];
+
+  // dark iron -> brown -> rust -> orange -> bright oxide
+  const RAMP = [
+    [0.00, [30, 15, 10]],
+    [0.30, [74, 38, 26]],
+    [0.52, [128, 62, 33]],
+    [0.72, [186, 96, 45]],
+    [0.88, [222, 133, 66]],
+    [1.00, [240, 168, 96]],
+  ];
+  const rampAt = t => {
+    for (let i = 1; i < RAMP.length; i++) {
+      if (t <= RAMP[i][0]) {
+        const [t0, c0] = RAMP[i - 1], [t1, c1] = RAMP[i];
+        const f = (t - t0) / (t1 - t0);
+        return [0, 1, 2].map(k => c0[k] + (c1[k] - c0[k]) * f);
+      }
+    }
+    return RAMP[RAMP.length - 1][1];
+  };
+
+  const img = g.createImageData(SZ, SZ);
+  for (let y = 0; y < SZ; y++) {
+    for (let x = 0; x < SZ; x++) {
+      const u = x / SZ, v = y / SZ;
+      let t = 0;
+      for (let o = 0; o < oct.length; o++) t += sample(oct[o], u, v) * wgt[o];
+      // sharpen contrast so rust pools into patches
+      t = Math.max(0, Math.min(1, (t - 0.5) * 1.9 + 0.5));
+      let [r, gg, b] = rampAt(t);
+      // cool blue-grey metal showing through where the metal channel is high
+      const m = sample(metal[0], u, v) * 0.65 + sample(metal[1], u, v) * 0.35;
+      if (m > 0.58) {
+        const f = Math.min(1, (m - 0.58) / 0.2) * 0.7;
+        r = r + (86 - r) * f; gg = gg + (92 - gg) * f; b = b + (108 - b) * f;
+      }
+      const i = (y * SZ + x) * 4;
+      img.data[i] = r; img.data[i + 1] = gg; img.data[i + 2] = b; img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
   return ctx.createPattern(c, 'repeat');
 }
 
@@ -845,13 +910,23 @@ function drawBox(cs, base, outline, alpha) {
     if (n[0] * VIEW_V[0] + n[1] * VIEW_V[1] + n[2] * VIEW_V[2] <= 0.001) continue;
     const lum = Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]);
     const pts = f.map(i => proj(cs[i][0], cs[i][1], cs[i][2]));
-    poly(pts, shade(base, 0.45 + 0.6 * lum), outline, 2);
-    if (theme.blockNoise && base === theme.block) {
+    const path = () => {
       ctx.beginPath();
       ctx.moveTo(pts[0][0], pts[0][1]);
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
       ctx.closePath();
-      texFill(theme.blockNoise, 0.7 + 0.3 * lum);
+    };
+    if (theme.blockNoise && base === theme.block) {
+      // fully textured face, then per-face lighting layered on top
+      poly(pts, shade(base, 0.45 + 0.6 * lum), outline, 1.5);
+      path(); texFill(theme.blockNoise, 1);
+      path();
+      ctx.fillStyle = 'rgba(0,0,0,' + (0.5 * (1 - lum)).toFixed(3) + ')';
+      ctx.fill();
+      path();
+      ctx.strokeStyle = outline; ctx.lineWidth = 1.5; ctx.stroke();
+    } else {
+      poly(pts, shade(base, 0.45 + 0.6 * lum), outline, 2);
     }
   }
   ctx.globalAlpha = 1;
